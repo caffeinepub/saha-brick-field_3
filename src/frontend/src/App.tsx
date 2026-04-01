@@ -44,6 +44,8 @@ export type Order = {
   brickItems: BrickItem[];
   totalBricks: number;
   batsSafety: number;
+  bricksDue: number;
+  batsDue: number;
   totalAmount: number;
   paidAmount: number;
   dueAmount: number;
@@ -96,6 +98,7 @@ export type CompleteDelivery = {
   totalAmount: number;
   totalLabours: number;
   perLabourAvg: number;
+  labourBreakdown?: Record<string, number>;
   paymentStatus: "not-paid" | "paid";
   createdAt: string;
 };
@@ -165,7 +168,13 @@ export default function App() {
   const addOrder = (
     order: Omit<
       Order,
-      "id" | "createdAt" | "status" | "paymentHistory" | "deliveryHistory"
+      | "id"
+      | "createdAt"
+      | "status"
+      | "paymentHistory"
+      | "deliveryHistory"
+      | "bricksDue"
+      | "batsDue"
     >,
   ) => {
     setOrders((prev) => [
@@ -174,6 +183,8 @@ export default function App() {
         ...order,
         id: crypto.randomUUID(),
         status: "open",
+        bricksDue: order.totalBricks,
+        batsDue: order.batsSafety,
         createdAt: new Date().toLocaleString(),
         paymentHistory: [],
         deliveryHistory: [],
@@ -206,10 +217,16 @@ export default function App() {
       prev.map((o) => {
         if (o.id !== orderId) return o;
         const newPaid = o.paidAmount + amount;
+        const newDue = o.totalAmount - newPaid;
+        const currentBricksDue = o.bricksDue ?? o.totalBricks;
+        const currentBatsDue = o.batsDue ?? o.batsSafety;
+        const shouldClose =
+          newDue === 0 && currentBricksDue === 0 && currentBatsDue === 0;
         return {
           ...o,
           paidAmount: newPaid,
-          dueAmount: o.totalAmount - newPaid,
+          dueAmount: newDue,
+          status: shouldClose ? "closed" : o.status,
           paymentHistory: [...o.paymentHistory, record],
         };
       }),
@@ -269,12 +286,56 @@ export default function App() {
         createdAt: new Date().toLocaleString(),
       },
     ]);
+
     // Mark the pending delivery as delivered
     setPendingDeliveries((prev) =>
       prev.map((d) =>
         d.id === cd.pendingDeliveryId ? { ...d, status: "delivered" } : d,
       ),
     );
+
+    // Find the pending delivery to get orderId
+    const pendingDel = pendingDeliveries.find(
+      (d) => d.id === cd.pendingDeliveryId,
+    );
+    if (pendingDel?.orderId) {
+      const deliveredBricks = cd.deliverItems
+        .filter((i) => i.type !== "Bats")
+        .reduce((s, i) => s + i.deliverQty, 0);
+      const deliveredBats = cd.deliverItems
+        .filter((i) => i.type === "Bats")
+        .reduce((s, i) => s + i.deliverQty, 0);
+
+      const now = new Date();
+      const deliveryRecords: DeliveryRecord[] = cd.deliverItems.map((item) => ({
+        id: crypto.randomUUID(),
+        date: now.toLocaleDateString("en-GB"),
+        brickType: item.type,
+        qty: item.deliverQty,
+        vehicle: cd.vehicleNumber,
+      }));
+
+      setOrders((prev) =>
+        prev.map((o) => {
+          if (o.id !== pendingDel.orderId) return o;
+          const currentBricksDue =
+            o.bricksDue !== undefined ? o.bricksDue : o.totalBricks;
+          const currentBatsDue =
+            o.batsDue !== undefined ? o.batsDue : o.batsSafety;
+          const newBricksDue = Math.max(0, currentBricksDue - deliveredBricks);
+          const newBatsDue = Math.max(0, currentBatsDue - deliveredBats);
+          const shouldClose =
+            o.dueAmount === 0 && newBricksDue === 0 && newBatsDue === 0;
+          return {
+            ...o,
+            bricksDue: newBricksDue,
+            batsDue: newBatsDue,
+            status: shouldClose ? "closed" : o.status,
+            deliveryHistory: [...o.deliveryHistory, ...deliveryRecords],
+          };
+        }),
+      );
+    }
   };
 
   const deleteCompleteDelivery = (id: string) => {
@@ -296,6 +357,9 @@ export default function App() {
     setPage("complete-delivery-form");
   };
 
+  const activeOrders = orders.filter((o) => o.status === "open");
+  const closedOrders = orders.filter((o) => o.status === "closed");
+
   return (
     <div className="min-h-screen bg-background flex flex-col items-center">
       <div className="w-full max-w-[480px] min-h-screen flex flex-col relative">
@@ -313,6 +377,7 @@ export default function App() {
             onGoCompleteDelivery={() => setPage("complete-delivery")}
             onGoSettings={() => setPage("settings")}
             onGoReports={() => setPage("reports")}
+            closedOrders={closedOrders}
           />
         )}
         {page === "add-order" && (
@@ -326,7 +391,7 @@ export default function App() {
         )}
         {page === "total-orders" && (
           <TotalOrders
-            orders={orders}
+            orders={activeOrders}
             onBack={() => setPage("dashboard")}
             onEdit={goEdit}
             onDelete={deleteOrder}

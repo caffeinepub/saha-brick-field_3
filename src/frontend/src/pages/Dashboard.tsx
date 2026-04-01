@@ -28,6 +28,7 @@ type Props = {
   onGoPendingDelivery?: () => void;
   onGoSettings: () => void;
   onGoReports?: () => void;
+  closedOrders?: Order[];
 };
 
 export default function Dashboard({
@@ -41,11 +42,12 @@ export default function Dashboard({
   onGoCompleteDelivery,
   onGoSettings,
   onGoReports,
+  closedOrders = [],
 }: Props) {
   const [modal, setModal] = useState<Modal>(null);
 
-  const totalOrders = orders.length;
-  const closedOrders = orders.filter((o) => o.status === "closed").length;
+  const totalOrders = orders.filter((o) => o.status === "open").length;
+  const closedOrdersCount = closedOrders.length;
   const pendingDelivery = deliveries.filter(
     (d) => d.status === "pending",
   ).length;
@@ -57,7 +59,11 @@ export default function Dashboard({
     .reduce((sum, o) => sum + o.dueAmount, 0);
   const bricksDue = orders
     .filter((o) => o.status !== "closed")
-    .reduce((sum, o) => sum + o.totalBricks, 0);
+    .reduce(
+      (sum, o) =>
+        sum + (o.bricksDue !== undefined ? o.bricksDue : o.totalBricks),
+      0,
+    );
 
   const cards: {
     id: string;
@@ -83,7 +89,7 @@ export default function Dashboard({
     {
       id: "closed-orders",
       label: "CLOSED ORDERS",
-      value: closedOrders,
+      value: closedOrdersCount,
       Icon: CheckCircle,
       clickable: true,
       modal: "closed-orders",
@@ -204,7 +210,7 @@ export default function Dashboard({
 
       {modal === "closed-orders" && (
         <ClosedOrdersModal
-          orders={orders.filter((o) => o.status === "closed")}
+          orders={closedOrders}
           onClose={() => setModal(null)}
         />
       )}

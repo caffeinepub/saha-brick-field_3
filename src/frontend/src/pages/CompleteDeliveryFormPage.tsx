@@ -68,13 +68,52 @@ export default function CompleteDeliveryFormPage({
     setCustomUnloadingInput("");
   };
 
-  const totalBricks = delivery.deliverItems.reduce(
-    (s, i) => s + i.deliverQty,
-    0,
-  );
+  // Load batsRate from settings (bats100)
+  const batsRate = (() => {
+    try {
+      const saved = localStorage.getItem("sbf_bricks_rate");
+      if (saved) return Number(JSON.parse(saved).bats100) || 0;
+    } catch {}
+    return 0;
+  })();
+
+  const batsItem = delivery.deliverItems.find((i) => i.type === "Bats");
+  const hasBats = !!batsItem;
+
+  // Bricks qty (exclude Bats)
+  const totalBricks = delivery.deliverItems
+    .filter((i) => i.type !== "Bats")
+    .reduce((s, i) => s + i.deliverQty, 0);
+
   const rate = Number(ratePerThousand) || 0;
-  const totalAmount = Math.round((totalBricks / 1000) * rate);
-  const totalLabours = loadingLabours.length;
+
+  // Bats: (batsQty / 100) * batsRate  |  Bricks: (bricksQty / 1000) * rate
+  const batsTotal = hasBats
+    ? Math.round((batsItem!.deliverQty / 100) * batsRate)
+    : 0;
+  const bricksTotal = Math.round((totalBricks / 1000) * rate);
+  const totalAmount = batsTotal + bricksTotal;
+  const allLabourNames = Array.from(
+    new Set([...loadingLabours, ...unloadingLabours]),
+  );
+  const totalLabours = allLabourNames.length;
+  const loadingHalf = totalAmount / 2;
+  const unloadingHalf = totalAmount / 2;
+  const perLoadingLabour =
+    loadingLabours.length > 0 ? loadingHalf / loadingLabours.length : 0;
+  const perUnloadingLabour =
+    unloadingLabours.length > 0 ? unloadingHalf / unloadingLabours.length : 0;
+  const labourBreakdown: Record<string, number> = {};
+  for (const name of allLabourNames) {
+    const inLoading = loadingLabours.includes(name);
+    const inUnloading = unloadingLabours.includes(name);
+    labourBreakdown[name] =
+      Math.round(
+        ((inLoading ? perLoadingLabour : 0) +
+          (inUnloading ? perUnloadingLabour : 0)) *
+          100,
+      ) / 100;
+  }
   const perLabourAvg =
     totalLabours > 0 ? Math.round((totalAmount / totalLabours) * 100) / 100 : 0;
 
@@ -101,6 +140,7 @@ export default function CompleteDeliveryFormPage({
       totalAmount,
       totalLabours,
       perLabourAvg,
+      labourBreakdown,
       paymentStatus,
     });
     toast.success("Complete Delivery সেভ হয়েছে!");
@@ -411,19 +451,19 @@ export default function CompleteDeliveryFormPage({
               </div>
             </div>
           </div>
-          {loadingLabours.length > 0 && (
+          {allLabourNames.length > 0 && (
             <div className="bg-white rounded-xl p-3 shadow-sm">
               <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">
                 LABOUR BREAKDOWN
               </div>
-              {loadingLabours.map((name, idx) => (
+              {allLabourNames.map((name, idx) => (
                 <div
                   key={`lb-${idx}-${name}`}
                   className="flex justify-between text-sm py-0.5"
                 >
                   <span className="text-gray-700">{name}</span>
                   <span className="font-bold text-gray-900">
-                    {perLabourAvg.toFixed(2)}
+                    {(labourBreakdown[name] || 0).toFixed(2)}
                   </span>
                 </div>
               ))}

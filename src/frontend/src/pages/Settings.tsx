@@ -1,5 +1,5 @@
 import { ArrowLeft, Plus, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 type VehicleType = "Tractor" | "12 Wheel";
@@ -92,15 +92,21 @@ export default function Settings({
     safety100: "",
   });
 
-  const [bricksRate, setBricksRate] = useState<BricksRate>({
-    oneNo: "",
-    twoNo: "",
-    threeNo: "",
-    onePichet: "",
-    twoPichet: "",
-    crack: "",
-    goria: "",
-    bats100: "",
+  const [bricksRate, setBricksRate] = useState<BricksRate>(() => {
+    try {
+      const saved = localStorage.getItem("sbf_bricks_rate");
+      if (saved) return JSON.parse(saved) as BricksRate;
+    } catch {}
+    return {
+      oneNo: "",
+      twoNo: "",
+      threeNo: "",
+      onePichet: "",
+      twoPichet: "",
+      crack: "",
+      goria: "",
+      bats100: "",
+    };
   });
 
   const addLoadingLabour = () => {
@@ -150,6 +156,7 @@ export default function Settings({
   };
 
   const saveBricksRate = () => {
+    localStorage.setItem("sbf_bricks_rate", JSON.stringify(bricksRate));
     toast.success("Bricks rate সেভ হয়েছে!");
   };
 

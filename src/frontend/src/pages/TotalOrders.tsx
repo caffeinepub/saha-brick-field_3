@@ -190,8 +190,16 @@ function OrderCard({
   onAddPayment: () => void;
   onPendingOrder: () => void;
 }) {
-  const bricksDue = order.totalBricks;
-  const batsDue = order.batsSafety;
+  // Use bricksDue/batsDue fields; fall back to totalBricks/batsSafety for old records
+  const bricksDue =
+    order.bricksDue !== undefined ? order.bricksDue : order.totalBricks;
+  const batsDue =
+    order.batsDue !== undefined ? order.batsDue : order.batsSafety;
+
+  // Show purple dot only if approxDeliveryDate is set
+  const showPurpleDot = !!(
+    order.approxDeliveryDate && order.approxDeliveryDate.trim() !== ""
+  );
 
   return (
     <div className="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -201,7 +209,9 @@ function OrderCard({
             <span className="font-extrabold text-base text-gray-900">
               {order.customerName}
             </span>
-            <span className="inline-block w-4 h-4 rounded-full bg-purple-500 shadow-md" />
+            {showPurpleDot && (
+              <span className="inline-block w-4 h-4 rounded-full bg-purple-500 shadow-md" />
+            )}
           </div>
           <div className="flex items-center gap-1.5">
             <button

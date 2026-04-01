@@ -20,25 +20,81 @@ function fmtDateShort(iso: string) {
   return `${d}/${m}/${y.slice(2)}`;
 }
 
+function getTodayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
+function getWeekRange() {
+  const today = new Date();
+  const day = today.getDay(); // 0=Sun, 1=Mon...
+  const diffToMon = day === 0 ? -6 : 1 - day;
+  const mon = new Date(today);
+  mon.setDate(today.getDate() + diffToMon);
+  const sun = new Date(mon);
+  sun.setDate(mon.getDate() + 6);
+  return {
+    from: mon.toISOString().slice(0, 10),
+    to: sun.toISOString().slice(0, 10),
+  };
+}
+
 export default function ReportsPage({ completeDeliveries, onBack }: Props) {
   const [activeTab, setActiveTab] = useState<"daily" | "weekly">("daily");
-  const [selectedDate, setSelectedDate] = useState("");
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
+  const [fromDate, setFromDate] = useState(() => getTodayIso());
+  const [toDate, setToDate] = useState(() => getTodayIso());
 
-  // ── DAILY: filter by single date, group by vehicle ──────────────────────
+  function handleTabChange(tab: "daily" | "weekly") {
+    setActiveTab(tab);
+    if (tab === "daily") {
+      setFromDate(getTodayIso());
+      setToDate(getTodayIso());
+    } else {
+      const { from, to } = getWeekRange();
+      setFromDate(from);
+      setToDate(to);
+    }
+  }
+
+  function handleFromChange(val: string) {
+    setFromDate(val);
+    if (!val && !toDate) {
+      if (activeTab === "daily") {
+        setFromDate(getTodayIso());
+        setToDate(getTodayIso());
+      } else {
+        const { from, to } = getWeekRange();
+        setFromDate(from);
+        setToDate(to);
+      }
+    }
+  }
+
+  function handleToChange(val: string) {
+    setToDate(val);
+    if (!val && !fromDate) {
+      if (activeTab === "daily") {
+        setFromDate(getTodayIso());
+        setToDate(getTodayIso());
+      } else {
+        const { from, to } = getWeekRange();
+        setFromDate(from);
+        setToDate(to);
+      }
+    }
+  }
+
+  // ── DAILY: filter by date range, group by vehicle ────────────────────────
   const dailyGrouped = useMemo(() => {
     const map = new Map<string, CompleteDelivery[]>();
-    if (!selectedDate) return map;
+    if (!fromDate || !toDate) return map;
     for (const d of completeDeliveries) {
       const dateKey = d.deliveryDate || "";
-      if (!dateKey || dateKey !== selectedDate) continue;
+      if (!dateKey || dateKey < fromDate || dateKey > toDate) continue;
       const key = d.vehicleNumber || "Unknown";
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(d);
     }
     return map;
-  }, [completeDeliveries, selectedDate]);
+  }, [completeDeliveries, fromDate, toDate]);
 
   // ── WEEKLY: filter by date range, group by labour + date ─────────────────
   const weeklyData = useMemo(() => {
@@ -62,6 +118,7 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
     for (const d of filtered) {
       dateSet.add(d.deliveryDate);
       for (const name of d.loadingLabours || []) labourSet.add(name);
+      for (const name of d.unloadingLabours || []) labourSet.add(name);
     }
     const activeDates = Array.from(dateSet).sort();
     const allLabours = Array.from(labourSet);
@@ -70,8 +127,12 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
     const labourTotals = new Map<string, number>();
     for (const l of allLabours) matrix.set(l, new Map());
     for (const d of filtered) {
-      const amt = d.perLabourAvg || 0;
-      for (const name of d.loadingLabours || []) {
+      const breakdown = d.labourBreakdown || {};
+      const allNames = Array.from(
+        new Set([...(d.loadingLabours || []), ...(d.unloadingLabours || [])]),
+      );
+      for (const name of allNames) {
+        const amt = breakdown[name] || 0;
         const lmap = matrix.get(name);
         if (lmap)
           lmap.set(d.deliveryDate, (lmap.get(d.deliveryDate) || 0) + amt);
@@ -91,6 +152,13 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
 
   const reportTitle =
     activeTab === "daily" ? "DAILY LABOURS REPORT" : "WEEKLY LABOURS REPORT";
+
+  const dateLabel =
+    fromDate && toDate
+      ? fromDate === toDate
+        ? fmtDate(fromDate)
+        : `${fmtDate(fromDate)} → ${fmtDate(toDate)}`
+      : "";
 
   // ── PRINT ────────────────────────────────────────────────────────────────
   function handlePrint() {
@@ -130,7 +198,7 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
     let y = 15;
     const fileName =
       activeTab === "daily"
-        ? `daily-report-${selectedDate || new Date().toISOString().slice(0, 10)}.pdf`
+        ? `daily-report-${fromDate || new Date().toISOString().slice(0, 10)}.pdf`
         : `weekly-report-${toDate || new Date().toISOString().slice(0, 10)}.pdf`;
 
     doc.setFontSize(16);
@@ -142,14 +210,6 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
     y += 7;
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    const dateLabel =
-      activeTab === "daily"
-        ? selectedDate
-          ? fmtDate(selectedDate)
-          : ""
-        : fromDate && toDate
-          ? `${fmtDate(fromDate)} — ${fmtDate(toDate)}`
-          : "";
     if (dateLabel) {
       doc.text(dateLabel, 105, y, { align: "center" });
       y += 10;
@@ -175,8 +235,10 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
         y += 13;
 
         const vLabours = new Set<string>();
-        for (const r of rows)
+        for (const r of rows) {
           for (const name of r.loadingLabours || []) vLabours.add(name);
+          for (const name of r.unloadingLabours || []) vLabours.add(name);
+        }
         const lCols = Array.from(vLabours);
         const colTotals = new Map<string, number>();
 
@@ -189,14 +251,17 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
             0,
           );
           const rate = r.ratePerThousand ?? 0;
-          const perLabour = r.perLabourAvg || 0;
+          const breakdown = r.labourBreakdown || {};
           return [
             (r.address || r.customerName || "-").toUpperCase(),
             String(qty),
             String(rate),
             ...lCols.map((name) => {
-              const inRow = (r.loadingLabours || []).includes(name);
-              const amt = inRow ? perLabour : 0;
+              const inRow = [
+                ...(r.loadingLabours || []),
+                ...(r.unloadingLabours || []),
+              ].includes(name);
+              const amt = inRow ? breakdown[name] || 0 : 0;
               if (inRow) {
                 colTotals.set(name, (colTotals.get(name) || 0) + amt);
                 globalLabourTotals.set(
@@ -327,7 +392,7 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
               ? "border-b-2 border-green-700 text-green-800"
               : "text-gray-500"
           }`}
-          onClick={() => setActiveTab("daily")}
+          onClick={() => handleTabChange("daily")}
         >
           DAILY REPORT
         </button>
@@ -339,7 +404,7 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
               ? "border-b-2 border-green-700 text-green-800"
               : "text-gray-500"
           }`}
-          onClick={() => setActiveTab("weekly")}
+          onClick={() => handleTabChange("weekly")}
         >
           WEEKLY REPORT
         </button>
@@ -347,39 +412,28 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
 
       <div className="p-4 bg-gray-50 flex-1">
         {/* Filters */}
-        <div className="flex items-center gap-2 mb-4 flex-wrap">
-          {activeTab === "daily" ? (
-            <>
-              <span className="text-sm font-semibold text-gray-700">DATE:</span>
-              <input
-                type="date"
-                data-ocid="reports.selected_date.input"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="border border-gray-300 rounded px-2 py-1 text-sm"
-              />
-            </>
-          ) : (
-            <>
-              <span className="text-sm font-semibold text-gray-700">FROM:</span>
-              <input
-                type="date"
-                data-ocid="reports.from_date.input"
-                value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-                className="border border-gray-300 rounded px-2 py-1 text-sm"
-              />
-              <span className="text-gray-500 font-bold">→</span>
-              <span className="text-sm font-semibold text-gray-700">TO:</span>
-              <input
-                type="date"
-                data-ocid="reports.to_date.input"
-                value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
-                className="border border-gray-300 rounded px-2 py-1 text-sm"
-              />
-            </>
-          )}
+        <div className="flex items-center gap-3 mb-4 flex-wrap">
+          <div className="flex items-center gap-1">
+            <span className="text-sm font-semibold text-gray-700">FROM:</span>
+            <input
+              type="date"
+              data-ocid="reports.from_date.input"
+              value={fromDate}
+              onChange={(e) => handleFromChange(e.target.value)}
+              className="border border-gray-300 rounded px-2 py-1 text-sm"
+            />
+          </div>
+          <span className="text-gray-500 font-bold">→</span>
+          <div className="flex items-center gap-1">
+            <span className="text-sm font-semibold text-gray-700">TO:</span>
+            <input
+              type="date"
+              data-ocid="reports.to_date.input"
+              value={toDate}
+              onChange={(e) => handleToChange(e.target.value)}
+              className="border border-gray-300 rounded px-2 py-1 text-sm"
+            />
+          </div>
         </div>
 
         {/* Buttons */}
@@ -412,20 +466,12 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
           <h2 className="text-center font-bold text-base mb-1 uppercase">
             {reportTitle}
           </h2>
-          <p className="text-center text-xs text-gray-500 mb-4">
-            {activeTab === "daily"
-              ? selectedDate
-                ? fmtDate(selectedDate)
-                : ""
-              : fromDate && toDate
-                ? `${fmtDate(fromDate)}  →  ${fmtDate(toDate)}`
-                : ""}
-          </p>
+          <p className="text-center text-xs text-gray-500 mb-4">{dateLabel}</p>
 
           {activeTab === "daily" ? (
             dailyGrouped.size === 0 ? (
               <div className="text-center text-gray-400 py-10 text-sm">
-                {selectedDate ? "কোনো ডেটা পাওয়া যায়নি" : "তারিখ সিলেক্ট করুন"}
+                {fromDate && toDate ? "কোনো ডেটা পাওয়া যায়নি" : "তারিখ সিলেক্ট করুন"}
               </div>
             ) : (
               (() => {
@@ -433,20 +479,30 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
                 const sections = Array.from(dailyGrouped.entries()).map(
                   ([vehicleNumber, rows]) => {
                     const vLabours = new Set<string>();
-                    for (const r of rows)
+                    for (const r of rows) {
                       for (const name of r.loadingLabours || [])
                         vLabours.add(name);
+                      for (const name of r.unloadingLabours || [])
+                        vLabours.add(name);
+                    }
                     const lCols = Array.from(vLabours);
                     const grandSum = rows.reduce(
                       (s, r) => s + (r.totalAmount || 0),
                       0,
                     );
                     for (const r of rows) {
-                      const amt = r.perLabourAvg || 0;
-                      for (const name of r.loadingLabours || []) {
+                      const brkd = r.labourBreakdown || {};
+                      const rowNames = Array.from(
+                        new Set([
+                          ...(r.loadingLabours || []),
+                          ...(r.unloadingLabours || []),
+                        ]),
+                      );
+                      for (const name of rowNames) {
                         globalLabourTotals.set(
                           name,
-                          (globalLabourTotals.get(name) || 0) + amt,
+                          (globalLabourTotals.get(name) || 0) +
+                            (brkd[name] || 0),
                         );
                       }
                     }
@@ -532,7 +588,7 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
                                   0,
                                 );
                                 const rate = r.ratePerThousand ?? 0;
-                                const perLabour = r.perLabourAvg || 0;
+                                const rowBreakdown = r.labourBreakdown || {};
                                 return (
                                   <tr
                                     key={`${r.customerName}-${r.address}-${i}`}
@@ -570,9 +626,10 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
                                       {rate}
                                     </td>
                                     {lCols.map((name) => {
-                                      const inRow = (
-                                        r.loadingLabours || []
-                                      ).includes(name);
+                                      const inRow = [
+                                        ...(r.loadingLabours || []),
+                                        ...(r.unloadingLabours || []),
+                                      ].includes(name);
                                       return (
                                         <td
                                           key={name}
@@ -583,7 +640,7 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
                                           }}
                                         >
                                           {inRow
-                                            ? `₹${Math.round(perLabour)}`
+                                            ? `₹${Math.round(rowBreakdown[name] || 0)}`
                                             : "-"}
                                         </td>
                                       );

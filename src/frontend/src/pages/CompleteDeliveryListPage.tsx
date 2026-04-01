@@ -203,9 +203,15 @@ export default function CompleteDeliveryListPage({
               </div>
 
               {/* Labour tags */}
-              {d.loadingLabours.length > 0 && (
+              {(d.loadingLabours.length > 0 ||
+                (d.unloadingLabours || []).length > 0) && (
                 <div className="flex flex-wrap gap-1.5 mb-3">
-                  {d.loadingLabours.map((name, idx) => (
+                  {Array.from(
+                    new Set([
+                      ...d.loadingLabours,
+                      ...(d.unloadingLabours || []),
+                    ]),
+                  ).map((name, idx) => (
                     <span
                       key={`lb-${d.id}-${idx}`}
                       className="border border-gray-300 rounded-full px-3 py-1 text-xs font-semibold text-gray-700"
@@ -240,8 +246,15 @@ export default function CompleteDeliveryListPage({
                   <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">
                     PER LABOR
                   </div>
-                  <div className="font-extrabold text-gray-900">
-                    {d.perLabourAvg.toFixed(2)}
+                  <div className="font-extrabold text-gray-900 text-xs">
+                    {d.labourBreakdown &&
+                    Object.keys(d.labourBreakdown).length > 0
+                      ? Object.entries(d.labourBreakdown).map(([n, v]) => (
+                          <div key={n}>
+                            {n}: {(v as number).toFixed(2)}
+                          </div>
+                        ))
+                      : d.perLabourAvg.toFixed(2)}
                   </div>
                 </div>
               </div>

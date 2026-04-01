@@ -17,7 +17,13 @@ type Props = {
   onSubmit: (
     order: Omit<
       Order,
-      "id" | "createdAt" | "status" | "paymentHistory" | "deliveryHistory"
+      | "id"
+      | "createdAt"
+      | "status"
+      | "paymentHistory"
+      | "deliveryHistory"
+      | "bricksDue"
+      | "batsDue"
     >,
   ) => void;
   onBack: () => void;
