@@ -1,8 +1,11 @@
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 import { ArrowLeft, Download, Printer } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { CompleteDelivery } from "../App";
+
+// jsPDF and jspdf-autotable are loaded via CDN in index.html
+declare const window: Window & {
+  jspdf: { jsPDF: new (opts: { unit: string; format: string }) => any };
+};
 
 type Props = { completeDeliveries: CompleteDelivery[]; onBack: () => void };
 
@@ -13,8 +16,8 @@ function fmtDate(iso: string) {
 }
 function fmtDateShort(iso: string) {
   if (!iso) return "";
-  const [, m, d] = iso.split("-");
-  return `${d}/${m}`;
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y.slice(2)}`;
 }
 
 export default function ReportsPage({ completeDeliveries, onBack }: Props) {
@@ -83,14 +86,7 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
       (a, b) => a + b,
       0,
     );
-    return {
-      activeDates,
-      allLabours,
-      matrix,
-
-      labourTotals,
-      overallTotal,
-    };
+    return { activeDates, allLabours, matrix, labourTotals, overallTotal };
   }, [completeDeliveries, fromDate, toDate]);
 
   const reportTitle =
@@ -125,6 +121,11 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
 
   // ── PDF ──────────────────────────────────────────────────────────────────
   function handleDownloadPdf() {
+    if (!window.jspdf) {
+      alert("PDF library not loaded. Please check your internet connection.");
+      return;
+    }
+    const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ unit: "mm", format: "a4" });
     let y = 15;
     const fileName =
@@ -163,7 +164,6 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
       const globalLabourTotals = new Map<string, number>();
 
       for (const [vehicleNumber, rows] of dailyGrouped) {
-        // vehicle box
         doc.setFillColor(255, 253, 231);
         doc.rect(10, y, 190, 9, "F");
         doc.setDrawColor(200, 192, 0);
@@ -180,7 +180,6 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
         const lCols = Array.from(vLabours);
         const colTotals = new Map<string, number>();
 
-        // No TOTAL column — only ADDRESS, QTY, RATE, labour columns
         const head = [
           ["ADDRESS", "QTY", "RATE", ...lCols.map((n) => n.toUpperCase())],
         ];
@@ -211,7 +210,7 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
         });
         const grandSum = rows.reduce((s, r) => s + (r.totalAmount || 0), 0);
 
-        autoTable(doc, {
+        doc.autoTable({
           startY: y,
           head,
           body,
@@ -227,12 +226,12 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
           alternateRowStyles: { fillColor: [245, 245, 245] },
           margin: { left: 10, right: 10 },
           tableWidth: 190,
-          didParseCell: (data) => {
+          didParseCell: (data: any) => {
             if (data.section === "body" && data.column.index > 0)
               data.cell.styles.halign = "center";
           },
         });
-        y = (doc as any).lastAutoTable.finalY + 6;
+        y = doc.lastAutoTable.finalY + 6;
         doc.setFont("helvetica", "bold");
         doc.setFontSize(13);
         doc.text(`GRAND TOTAL  \u20B9${grandSum}`, 105, y, { align: "center" });
@@ -242,7 +241,6 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
           y = 15;
         }
       }
-      // Labour summary — single horizontal line, all caps, spaced
       const summaryParts = Array.from(globalLabourTotals.entries()).map(
         ([n, a]) => `${n.toUpperCase()}  \u20B9${Math.round(a)}`,
       );
@@ -259,30 +257,24 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
       }
     } else {
       // WEEKLY
-      const {
-        activeDates,
-        allLabours,
-        matrix,
-
-        labourTotals,
-        overallTotal,
-      } = weeklyData;
+      const { activeDates, allLabours, matrix, labourTotals, overallTotal } =
+        weeklyData;
       if (activeDates.length === 0) {
         doc.text("No data found", 105, y, { align: "center" });
         doc.save(fileName);
         return;
       }
-      // No TOTAL column in weekly either
-      const head = [["NAME", ...activeDates.map(fmtDateShort)]];
+      const head = [["NAME", ...activeDates.map(fmtDateShort), "TOTAL"]];
       const body = allLabours.map((name) => [
         name.toUpperCase(),
         ...activeDates.map((date) => {
           const v = matrix.get(name)?.get(date);
           return v ? String(Math.round(v)) : "-";
         }),
+        String(Math.round(labourTotals.get(name) || 0)),
       ]);
 
-      autoTable(doc, {
+      doc.autoTable({
         startY: y,
         head,
         body,
@@ -298,45 +290,23 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
         alternateRowStyles: { fillColor: [245, 245, 245] },
         margin: { left: 10, right: 10 },
         tableWidth: 190,
-        didParseCell: (data) => {
+        didParseCell: (data: any) => {
           if (data.section === "body" && data.column.index > 0)
             data.cell.styles.halign = "center";
         },
       });
-      y = (doc as any).lastAutoTable.finalY + 6;
+      y = doc.lastAutoTable.finalY + 6;
       doc.setFont("helvetica", "bold");
       doc.setFontSize(13);
       doc.text(`GRAND TOTAL  \u20B9${Math.round(overallTotal)}`, 105, y, {
         align: "center",
       });
-      y += 10;
-      // Labour summary line
-      const summaryParts = Array.from(labourTotals.entries()).map(
-        ([n, a]) => `${n.toUpperCase()}  \u20B9${Math.round(a)}`,
-      );
-      if (summaryParts.length > 0) {
-        doc.setDrawColor(180, 180, 180);
-        doc.line(10, y, 200, y);
-        y += 6;
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(11);
-        doc.text(summaryParts.join("      "), 105, y, {
-          align: "center",
-          maxWidth: 185,
-        });
-      }
     }
     doc.save(fileName);
   }
 
-  const {
-    activeDates,
-    allLabours,
-    matrix,
-
-    labourTotals,
-    overallTotal,
-  } = weeklyData;
+  const { activeDates, allLabours, matrix, labourTotals, overallTotal } =
+    weeklyData;
 
   return (
     <div className="flex flex-col flex-1 pb-16">
@@ -553,7 +523,6 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
                                     {n.toUpperCase()}
                                   </th>
                                 ))}
-                                {/* NO TOTAL COLUMN */}
                               </tr>
                             </thead>
                             <tbody>
@@ -619,15 +588,12 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
                                         </td>
                                       );
                                     })}
-                                    {/* NO TOTAL CELL */}
                                   </tr>
                                 );
                               })}
                             </tbody>
-                            {/* NO COLUMN TOTAL TFOOT */}
                           </table>
                         </div>
-                        {/* Single GRAND TOTAL line */}
                         <div
                           className="text-center font-bold text-base mt-3 mb-1 uppercase"
                           style={{ fontSize: "15px", letterSpacing: "0.5px" }}
@@ -638,7 +604,6 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
                     );
                   },
                 );
-                // Labour summary: single horizontal line, ALL CAPS, spaced
                 const summaryEntries = Array.from(globalLabourTotals.entries());
                 return (
                   <>
@@ -711,7 +676,17 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
                           {fmtDateShort(d)}
                         </th>
                       ))}
-                      {/* NO TOTAL COLUMN HEADER */}
+                      <th
+                        style={{
+                          padding: "8px",
+                          border: "1px solid #999",
+                          textAlign: "center",
+                          fontWeight: "bold",
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        TOTAL
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -747,45 +722,27 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
                             </td>
                           );
                         })}
-                        {/* NO TOTAL CELL */}
+                        <td
+                          style={{
+                            padding: "7px 8px",
+                            border: "1px solid #bbb",
+                            textAlign: "center",
+                            fontWeight: 600,
+                          }}
+                        >
+                          ₹{Math.round(labourTotals.get(name) || 0)}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
-                  {/* NO TFOOT — GRAND TOTAL shown separately below */}
                 </table>
               </div>
-              {/* Single GRAND TOTAL line for weekly */}
               <div
                 className="text-center font-bold uppercase mt-4 mb-3"
                 style={{ fontSize: "15px", letterSpacing: "0.5px" }}
               >
                 GRAND TOTAL ₹{Math.round(overallTotal)}
               </div>
-              {/* Labour summary: single horizontal line, ALL CAPS */}
-              {allLabours.length > 0 && (
-                <div
-                  style={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    justifyContent: "center",
-                    gap: "24px",
-                    fontWeight: 700,
-                    fontSize: "13px",
-                    color: "#1b5e20",
-                    textTransform: "uppercase",
-                    borderTop: "2px solid #ccc",
-                    paddingTop: "10px",
-                    letterSpacing: "0.5px",
-                  }}
-                >
-                  {allLabours.map((name) => (
-                    <span key={name}>
-                      {name.toUpperCase()} ₹
-                      {Math.round(labourTotals.get(name) || 0)}
-                    </span>
-                  ))}
-                </div>
-              )}
             </>
           )}
         </div>
