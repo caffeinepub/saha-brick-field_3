@@ -1,4 +1,5 @@
 import {
+  BarChart2,
   CheckCircle,
   ClipboardList,
   Layers,
@@ -24,6 +25,7 @@ type Props = {
   onGoTotalOrders: () => void;
   onGoPendingDelivery?: () => void;
   onGoSettings: () => void;
+  onGoReports?: () => void;
 };
 
 export default function Dashboard({
@@ -34,6 +36,7 @@ export default function Dashboard({
   onGoTotalOrders,
   onGoPendingDelivery,
   onGoSettings,
+  onGoReports,
 }: Props) {
   const [modal, setModal] = useState<Modal>(null);
 
@@ -118,6 +121,14 @@ export default function Dashboard({
       Icon: Settings,
       clickable: true,
       onClickOverride: onGoSettings,
+    },
+    {
+      id: "reports",
+      label: "REPORTS",
+      value: "",
+      Icon: BarChart2,
+      clickable: true,
+      onClickOverride: onGoReports,
     },
   ];
 

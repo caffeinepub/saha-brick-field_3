@@ -9,6 +9,7 @@ import DirectDelivery from "./pages/DirectDelivery";
 import EditOrder from "./pages/EditOrder";
 import PendingDeliveryPage from "./pages/PendingDeliveryPage";
 import PendingOrderPage from "./pages/PendingOrderPage";
+import ReportsPage from "./pages/ReportsPage";
 import Settings from "./pages/Settings";
 import TotalOrders from "./pages/TotalOrders";
 
@@ -114,6 +115,7 @@ export type Page =
   | "total-orders"
   | "edit-order"
   | "settings"
+  | "reports"
   | "pending-order"
   | "pending-delivery"
   | "complete-delivery-form"
@@ -308,6 +310,7 @@ export default function App() {
               pendingDeliveries.filter((d) => d.status === "pending").length
             }
             onGoSettings={() => setPage("settings")}
+            onGoReports={() => setPage("reports")}
           />
         )}
         {page === "add-order" && (
@@ -383,6 +386,12 @@ export default function App() {
             vehicles={vehicles}
             onSaveVehicle={saveVehicle}
             onDeleteVehicle={deleteVehicle}
+          />
+        )}
+        {page === "reports" && (
+          <ReportsPage
+            completeDeliveries={completeDeliveries}
+            onBack={() => setPage("dashboard")}
           />
         )}
         <BottomNav current={page} onChange={setPage} />
