@@ -1,5 +1,5 @@
 import { ArrowLeft, Plus, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 type VehicleType = "Tractor" | "12 Wheel";
@@ -82,14 +82,32 @@ export default function Settings({
   const [unloadingLabours, setUnloadingLabours] = useState<string[]>([]);
   const [rateVehicleType, setRateVehicleType] =
     useState<VehicleType>("Tractor");
-  const [tractorRate, setTractorRate] = useState<TractorRate>({
-    localPerThousand: "",
-    outsidePerThousand: "",
-    safety100: "",
+  const [tractorRate, setTractorRate] = useState<TractorRate>(() => {
+    try {
+      const saved = localStorage.getItem("sbf_rate");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        console.log("[Settings] Fetched rate from localStorage:", parsed);
+        return (
+          parsed.tractorRate ?? {
+            localPerThousand: "",
+            outsidePerThousand: "",
+            safety100: "",
+          }
+        );
+      }
+    } catch {}
+    return { localPerThousand: "", outsidePerThousand: "", safety100: "" };
   });
-  const [wheelRate, setWheelRate] = useState<WheelRate>({
-    perThousand: "",
-    safety100: "",
+  const [wheelRate, setWheelRate] = useState<WheelRate>(() => {
+    try {
+      const saved = localStorage.getItem("sbf_rate");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.wheelRate ?? { perThousand: "", safety100: "" };
+      }
+    } catch {}
+    return { perThousand: "", safety100: "" };
   });
 
   const [bricksRate, setBricksRate] = useState<BricksRate>(() => {
@@ -152,6 +170,9 @@ export default function Settings({
   };
 
   const saveRate = () => {
+    const rateData = { tractorRate, wheelRate };
+    localStorage.setItem("sbf_rate", JSON.stringify(rateData));
+    console.log("[Settings] Saved rate to localStorage:", rateData);
     toast.success("Rate সেভ হয়েছে!");
   };
 
