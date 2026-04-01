@@ -65,6 +65,25 @@ export default function PendingOrderPage({ order, onBack, onSave }: Props) {
       return;
     }
 
+    // Read rate from settings to carry forward into the pending delivery
+    const savedRate = (() => {
+      try {
+        const hasBats = items.some((i) => i.type === "Bats");
+        if (hasBats) {
+          const raw = localStorage.getItem("sbf_bricks_rate");
+          if (raw) return Number(JSON.parse(raw).bats100) || 0;
+        } else {
+          const raw = localStorage.getItem("sbf_rate");
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            const isLocal = order.locationType === "Local";
+            return Number(isLocal ? parsed.local : parsed.outside) || 0;
+          }
+        }
+      } catch {}
+      return 0;
+    })();
+
     onSave({
       orderId: order.id,
       customerName: order.customerName,
@@ -78,6 +97,7 @@ export default function PendingOrderPage({ order, onBack, onSave }: Props) {
         deliverQty: b.deliverQty,
       })),
       dueAmount: order.dueAmount,
+      rate: savedRate,
       status: "pending",
     });
     toast.success("Pending delivery যোগ হয়েছে!");

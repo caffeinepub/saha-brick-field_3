@@ -67,6 +67,7 @@ export type PendingDelivery = {
   pendingDate: string;
   deliverItems: { type: string; deliverQty: number }[];
   dueAmount: number;
+  rate?: number;
   status: "pending" | "delivered";
   createdAt: string;
 };

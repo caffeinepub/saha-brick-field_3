@@ -33,7 +33,9 @@ export default function CompleteDeliveryFormPage({
   const [unloadingLabours, setUnloadingLabours] = useState<string[]>([]);
   const [customLoadingInput, setCustomLoadingInput] = useState("");
   const [customUnloadingInput, setCustomUnloadingInput] = useState("");
-  const [ratePerThousand, setRatePerThousand] = useState("230");
+  const [ratePerThousand, setRatePerThousand] = useState(
+    delivery.rate ? String(delivery.rate) : "230",
+  );
   const [paymentStatus, setPaymentStatus] = useState<"not-paid" | "paid">(
     "not-paid",
   );
@@ -68,13 +70,17 @@ export default function CompleteDeliveryFormPage({
     setCustomUnloadingInput("");
   };
 
-  // Load batsRate from settings (bats100)
+  // Load batsRate from settings (bats100), fall back to delivery.rate
   const batsRate = (() => {
     try {
       const saved = localStorage.getItem("sbf_bricks_rate");
-      if (saved) return Number(JSON.parse(saved).bats100) || 0;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const fromSettings = Number(parsed.bats100) || 0;
+        if (fromSettings > 0) return fromSettings;
+      }
     } catch {}
-    return 0;
+    return delivery.rate || 0;
   })();
 
   const batsItem = delivery.deliverItems.find((i) => i.type === "Bats");
