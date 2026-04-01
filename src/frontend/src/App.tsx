@@ -309,6 +309,8 @@ export default function App() {
             pendingDeliveriesCount={
               pendingDeliveries.filter((d) => d.status === "pending").length
             }
+            completeDeliveriesCount={completeDeliveries.length}
+            onGoCompleteDelivery={() => setPage("complete-delivery")}
             onGoSettings={() => setPage("settings")}
             onGoReports={() => setPage("reports")}
           />
@@ -376,7 +378,7 @@ export default function App() {
         {page === "complete-delivery" && (
           <CompleteDeliveryListPage
             deliveries={completeDeliveries}
-            onBack={() => setPage("pending-delivery")}
+            onBack={() => setPage("dashboard")}
             onDelete={deleteCompleteDelivery}
           />
         )}

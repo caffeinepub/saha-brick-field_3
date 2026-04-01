@@ -2,91 +2,135 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { ArrowLeft, Download, Printer } from "lucide-react";
 import { useMemo, useState } from "react";
+import type { CompleteDelivery } from "../App";
 
-type BrickItem = {
-  type: string;
-  quantity: number;
-  rate: number;
-  total: number;
-};
-type LabourItem = { name: string; amount: number };
-type Delivery = {
-  customerName: string;
-  address: string;
-  date: string;
-  vehicleType: string;
-  vehicleNumber: string;
-  bricks: BrickItem[];
-  labours: LabourItem[];
-  grandTotal: number;
-};
+type Props = { completeDeliveries: CompleteDelivery[]; onBack: () => void };
 
-type Props = {
-  completeDeliveries: unknown[];
-  onBack: () => void;
-};
+function fmtDate(iso: string) {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
+function fmtDateShort(iso: string) {
+  if (!iso) return "";
+  const [, m, d] = iso.split("-");
+  return `${d}/${m}`;
+}
 
 export default function ReportsPage({ completeDeliveries, onBack }: Props) {
   const [activeTab, setActiveTab] = useState<"daily" | "weekly">("daily");
+  const [selectedDate, setSelectedDate] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
 
-  const deliveries = completeDeliveries as Delivery[];
-
-  const filtered = useMemo(() => {
-    return deliveries.filter((d) => {
-      if (!d.date) return false;
-      if (fromDate && d.date < fromDate) return false;
-      if (toDate && d.date > toDate) return false;
-      return true;
-    });
-  }, [deliveries, fromDate, toDate]);
-
-  // Group by vehicle number
-  const grouped = useMemo(() => {
-    const map = new Map<string, Delivery[]>();
-    for (const d of filtered) {
+  // ── DAILY: filter by single date, group by vehicle ──────────────────────
+  const dailyGrouped = useMemo(() => {
+    const map = new Map<string, CompleteDelivery[]>();
+    if (!selectedDate) return map;
+    for (const d of completeDeliveries) {
+      const dateKey = d.deliveryDate || "";
+      if (!dateKey || dateKey !== selectedDate) continue;
       const key = d.vehicleNumber || "Unknown";
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(d);
     }
     return map;
-  }, [filtered]);
+  }, [completeDeliveries, selectedDate]);
+
+  // ── WEEKLY: filter by date range, group by labour + date ─────────────────
+  const weeklyData = useMemo(() => {
+    if (!fromDate || !toDate)
+      return {
+        activeDates: [],
+        allLabours: [],
+        matrix: new Map<string, Map<string, number>>(),
+        dayTotals: new Map<string, number>(),
+        labourTotals: new Map<string, number>(),
+        overallTotal: 0,
+      };
+    const filtered = completeDeliveries.filter(
+      (d) =>
+        d.deliveryDate &&
+        d.deliveryDate >= fromDate &&
+        d.deliveryDate <= toDate,
+    );
+    const dateSet = new Set<string>();
+    const labourSet = new Set<string>();
+    for (const d of filtered) {
+      dateSet.add(d.deliveryDate);
+      for (const name of d.loadingLabours || []) labourSet.add(name);
+    }
+    const activeDates = Array.from(dateSet).sort();
+    const allLabours = Array.from(labourSet);
+    const matrix = new Map<string, Map<string, number>>();
+    const dayTotals = new Map<string, number>();
+    const labourTotals = new Map<string, number>();
+    for (const l of allLabours) matrix.set(l, new Map());
+    for (const d of filtered) {
+      const amt = d.perLabourAvg || 0;
+      for (const name of d.loadingLabours || []) {
+        const lmap = matrix.get(name);
+        if (lmap)
+          lmap.set(d.deliveryDate, (lmap.get(d.deliveryDate) || 0) + amt);
+        dayTotals.set(
+          d.deliveryDate,
+          (dayTotals.get(d.deliveryDate) || 0) + amt,
+        );
+        labourTotals.set(name, (labourTotals.get(name) || 0) + amt);
+      }
+    }
+    const overallTotal = Array.from(labourTotals.values()).reduce(
+      (a, b) => a + b,
+      0,
+    );
+    return {
+      activeDates,
+      allLabours,
+      matrix,
+
+      labourTotals,
+      overallTotal,
+    };
+  }, [completeDeliveries, fromDate, toDate]);
 
   const reportTitle =
     activeTab === "daily" ? "DAILY LABOURS REPORT" : "WEEKLY LABOURS REPORT";
-  const fileName =
-    activeTab === "daily"
-      ? `daily-report-${toDate || new Date().toISOString().slice(0, 10)}.pdf`
-      : `weekly-report-${toDate || new Date().toISOString().slice(0, 10)}.pdf`;
 
+  // ── PRINT ────────────────────────────────────────────────────────────────
   function handlePrint() {
-    const printContent = document.getElementById("report-print-area");
-    if (!printContent) return;
+    const el = document.getElementById("report-print-area");
+    if (!el) return;
     const win = window.open("", "", "width=900,height=700");
     if (!win) return;
     win.document.write(`<html><head><title>${reportTitle}</title><style>
-      body { font-family: Arial, sans-serif; margin: 20px; font-size: 13px; }
-      h1 { text-align: center; font-size: 18px; font-weight: bold; margin: 0; }
-      h2 { text-align: center; font-size: 14px; font-weight: bold; margin: 4px 0; }
-      table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
-      th { background: #1b5e20; color: white; font-weight: bold; padding: 8px; text-align: center; border: 1px solid #ccc; }
-      td { border: 1px solid #ccc; padding: 8px; font-size: 13px; }
-      tr:nth-child(even) td { background: #f5f5f5; }
-      .vehicle-header { background: #fffde7; font-weight: bold; padding: 8px 10px; width: 100%; box-sizing: border-box; display: block; margin: 14px 0 4px 0; border: 1px solid #e0d000; font-size: 13px; }
-      .grand-total { text-align: center; font-weight: bold; font-size: 16px; margin: 10px 0; }
-      .labour-summary { font-size: 12px; margin: 6px 0 14px 0; text-align: center; font-weight: 600; }
-      @media print { @page { size: A4; margin: 15mm; } }
+      body{font-family:Arial,sans-serif;margin:20px;font-size:13px;}
+      h1{text-align:center;font-size:18px;font-weight:bold;margin:0;text-transform:uppercase;}
+      h2{text-align:center;font-size:14px;font-weight:bold;margin:4px 0;text-transform:uppercase;}
+      p.date-line{text-align:center;font-size:11px;color:#555;margin-bottom:12px;}
+      table{width:100%;border-collapse:collapse;margin-bottom:6px;}
+      th{background:#1b5e20;color:white;font-weight:bold;padding:8px;text-align:center;border:1px solid #999;text-transform:uppercase;}
+      th.left{text-align:left;}
+      td{border:1px solid #bbb;padding:7px 8px;font-size:12px;}
+      tr:nth-child(even) td{background:#f5f5f5;}
+      .vehicle-box{background:#fffde7;border:1px solid #ccc000;font-weight:bold;padding:7px 10px;margin:14px 0 4px 0;font-size:13px;text-transform:uppercase;}
+      .grand-total{text-align:center;font-weight:bold;font-size:15px;margin:10px 0 6px 0;text-transform:uppercase;}
+      .labour-summary{display:flex;flex-wrap:wrap;justify-content:center;gap:24px;font-size:13px;font-weight:700;margin:10px 0 16px 0;color:#1b5e20;text-transform:uppercase;padding:8px 0;border-top:2px solid #ccc;letter-spacing:0.5px;}
+      @media print{@page{size:A4;margin:15mm;}}
     </style></head><body>`);
-    win.document.write(printContent.innerHTML);
+    win.document.write(el.innerHTML);
     win.document.write("</body></html>");
     win.document.close();
     setTimeout(() => win.print(), 300);
   }
 
+  // ── PDF ──────────────────────────────────────────────────────────────────
   function handleDownloadPdf() {
     const doc = new jsPDF({ unit: "mm", format: "a4" });
     let y = 15;
+    const fileName =
+      activeTab === "daily"
+        ? `daily-report-${selectedDate || new Date().toISOString().slice(0, 10)}.pdf`
+        : `weekly-report-${toDate || new Date().toISOString().slice(0, 10)}.pdf`;
 
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
@@ -98,107 +142,201 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
     const dateLabel =
-      fromDate && toDate
-        ? `${fromDate}  to  ${toDate}`
-        : fromDate || toDate || new Date().toISOString().slice(0, 10);
-    doc.text(`Date: ${dateLabel}`, 105, y, { align: "center" });
-    y += 10;
+      activeTab === "daily"
+        ? selectedDate
+          ? fmtDate(selectedDate)
+          : ""
+        : fromDate && toDate
+          ? `${fmtDate(fromDate)} — ${fmtDate(toDate)}`
+          : "";
+    if (dateLabel) {
+      doc.text(dateLabel, 105, y, { align: "center" });
+      y += 10;
+    } else y += 4;
 
-    if (grouped.size === 0) {
-      doc.text("No data found", 105, y, { align: "center" });
-      doc.save(fileName);
-      return;
-    }
+    if (activeTab === "daily") {
+      if (dailyGrouped.size === 0) {
+        doc.text("No data found", 105, y, { align: "center" });
+        doc.save(fileName);
+        return;
+      }
+      const globalLabourTotals = new Map<string, number>();
 
-    for (const [vehicleNumber, rows] of grouped) {
-      doc.setFillColor(255, 253, 231);
-      doc.rect(10, y, 190, 9, "F");
-      doc.setDrawColor(200, 180, 0);
-      doc.rect(10, y, 190, 9);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(12);
-      doc.setTextColor(0, 0, 0);
-      doc.text(`VEHICLE: ${vehicleNumber}`, 14, y + 6.5);
-      y += 13;
+      for (const [vehicleNumber, rows] of dailyGrouped) {
+        // vehicle box
+        doc.setFillColor(255, 253, 231);
+        doc.rect(10, y, 190, 9, "F");
+        doc.setDrawColor(200, 192, 0);
+        doc.rect(10, y, 190, 9);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(12);
+        doc.setTextColor(0, 0, 0);
+        doc.text(`VEHICLE: ${vehicleNumber}`, 14, y + 6.5);
+        y += 13;
 
-      const vehicleLabourNames = new Set<string>();
-      for (const r of rows)
-        for (const l of r.labours || []) vehicleLabourNames.add(l.name);
-      const labourCols = Array.from(vehicleLabourNames);
+        const vLabours = new Set<string>();
+        for (const r of rows)
+          for (const name of r.loadingLabours || []) vLabours.add(name);
+        const lCols = Array.from(vLabours);
+        const colTotals = new Map<string, number>();
 
-      const head = [["ADDRESS", "QUANTITY", "RATE", ...labourCols, "TOTAL"]];
-      const body = rows.map((r) => {
-        const qty = (r.bricks || []).reduce((s, b) => s + (b.quantity || 0), 0);
-        const rate = (r.bricks || [])[0]?.rate ?? 0;
-        const labourAmounts = labourCols.map((name) => {
-          const l = (r.labours || []).find((x) => x.name === name);
-          return l ? `Rs${l.amount}` : "-";
-        });
-        return [
-          r.address || r.customerName || "-",
-          String(qty),
-          String(rate),
-          ...labourAmounts,
-          `Rs${r.grandTotal ?? 0}`,
+        // No TOTAL column — only ADDRESS, QTY, RATE, labour columns
+        const head = [
+          ["ADDRESS", "QTY", "RATE", ...lCols.map((n) => n.toUpperCase())],
         ];
-      });
+        const body = rows.map((r) => {
+          const qty = (r.deliverItems || []).reduce(
+            (s, b) => s + (b.deliverQty || 0),
+            0,
+          );
+          const rate = r.ratePerThousand ?? 0;
+          const perLabour = r.perLabourAvg || 0;
+          return [
+            (r.address || r.customerName || "-").toUpperCase(),
+            String(qty),
+            String(rate),
+            ...lCols.map((name) => {
+              const inRow = (r.loadingLabours || []).includes(name);
+              const amt = inRow ? perLabour : 0;
+              if (inRow) {
+                colTotals.set(name, (colTotals.get(name) || 0) + amt);
+                globalLabourTotals.set(
+                  name,
+                  (globalLabourTotals.get(name) || 0) + amt,
+                );
+              }
+              return inRow ? `${Math.round(amt)}` : "-";
+            }),
+          ];
+        });
+        const grandSum = rows.reduce((s, r) => s + (r.totalAmount || 0), 0);
+
+        autoTable(doc, {
+          startY: y,
+          head,
+          body,
+          theme: "grid",
+          styles: { fontSize: 10, cellPadding: 3, textColor: [0, 0, 0] },
+          headStyles: {
+            fillColor: [27, 94, 32],
+            textColor: [255, 255, 255],
+            fontStyle: "bold",
+            halign: "center",
+          },
+          columnStyles: { 0: { halign: "left" } },
+          alternateRowStyles: { fillColor: [245, 245, 245] },
+          margin: { left: 10, right: 10 },
+          tableWidth: 190,
+          didParseCell: (data) => {
+            if (data.section === "body" && data.column.index > 0)
+              data.cell.styles.halign = "center";
+          },
+        });
+        y = (doc as any).lastAutoTable.finalY + 6;
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(13);
+        doc.text(`GRAND TOTAL  \u20B9${grandSum}`, 105, y, { align: "center" });
+        y += 12;
+        if (y > 265) {
+          doc.addPage();
+          y = 15;
+        }
+      }
+      // Labour summary — single horizontal line, all caps, spaced
+      const summaryParts = Array.from(globalLabourTotals.entries()).map(
+        ([n, a]) => `${n.toUpperCase()}  \u20B9${Math.round(a)}`,
+      );
+      if (summaryParts.length > 0) {
+        doc.setDrawColor(180, 180, 180);
+        doc.line(10, y, 200, y);
+        y += 6;
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(11);
+        doc.text(summaryParts.join("      "), 105, y, {
+          align: "center",
+          maxWidth: 185,
+        });
+      }
+    } else {
+      // WEEKLY
+      const {
+        activeDates,
+        allLabours,
+        matrix,
+
+        labourTotals,
+        overallTotal,
+      } = weeklyData;
+      if (activeDates.length === 0) {
+        doc.text("No data found", 105, y, { align: "center" });
+        doc.save(fileName);
+        return;
+      }
+      // No TOTAL column in weekly either
+      const head = [["NAME", ...activeDates.map(fmtDateShort)]];
+      const body = allLabours.map((name) => [
+        name.toUpperCase(),
+        ...activeDates.map((date) => {
+          const v = matrix.get(name)?.get(date);
+          return v ? String(Math.round(v)) : "-";
+        }),
+      ]);
 
       autoTable(doc, {
         startY: y,
         head,
         body,
         theme: "grid",
-        styles: { fontSize: 12, cellPadding: 3, textColor: [0, 0, 0] },
+        styles: { fontSize: 10, cellPadding: 3, textColor: [0, 0, 0] },
         headStyles: {
           fillColor: [27, 94, 32],
           textColor: [255, 255, 255],
           fontStyle: "bold",
           halign: "center",
         },
-        columnStyles: { 0: { halign: "left", cellWidth: 40 } },
+        columnStyles: { 0: { halign: "left" } },
         alternateRowStyles: { fillColor: [245, 245, 245] },
         margin: { left: 10, right: 10 },
         tableWidth: 190,
         didParseCell: (data) => {
-          if (data.section === "body" && data.column.index > 0) {
+          if (data.section === "body" && data.column.index > 0)
             data.cell.styles.halign = "center";
-          }
         },
       });
-
       y = (doc as any).lastAutoTable.finalY + 6;
-
-      const grandSum = rows.reduce((s, r) => s + (r.grandTotal || 0), 0);
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(14);
-      doc.text(`GRAND TOTAL  Rs${grandSum}`, 105, y, { align: "center" });
-      y += 8;
-
-      const labourTotals = new Map<string, number>();
-      for (const r of rows) {
-        for (const l of r.labours || []) {
-          labourTotals.set(l.name, (labourTotals.get(l.name) || 0) + l.amount);
-        }
-      }
-      const labourLine = Array.from(labourTotals.entries())
-        .map(([n, a]) => `${n} Rs${a}`)
-        .join("  |  ");
-      if (labourLine) {
-        doc.setFont("helvetica", "normal");
+      doc.setFontSize(13);
+      doc.text(`GRAND TOTAL  \u20B9${Math.round(overallTotal)}`, 105, y, {
+        align: "center",
+      });
+      y += 10;
+      // Labour summary line
+      const summaryParts = Array.from(labourTotals.entries()).map(
+        ([n, a]) => `${n.toUpperCase()}  \u20B9${Math.round(a)}`,
+      );
+      if (summaryParts.length > 0) {
+        doc.setDrawColor(180, 180, 180);
+        doc.line(10, y, 200, y);
+        y += 6;
+        doc.setFont("helvetica", "bold");
         doc.setFontSize(11);
-        doc.text(labourLine, 105, y, { align: "center", maxWidth: 185 });
-        y += 10;
-      }
-
-      y += 6;
-      if (y > 260) {
-        doc.addPage();
-        y = 15;
+        doc.text(summaryParts.join("      "), 105, y, {
+          align: "center",
+          maxWidth: 185,
+        });
       }
     }
-
     doc.save(fileName);
   }
+
+  const {
+    activeDates,
+    allLabours,
+    matrix,
+
+    labourTotals,
+    overallTotal,
+  } = weeklyData;
 
   return (
     <div className="flex flex-col flex-1 pb-16">
@@ -209,6 +347,7 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
         <span className="font-bold text-base flex-1">REPORTS</span>
       </div>
 
+      {/* Tabs */}
       <div className="flex border-b border-gray-300 bg-white">
         <button
           type="button"
@@ -237,28 +376,43 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
       </div>
 
       <div className="p-4 bg-gray-50 flex-1">
+        {/* Filters */}
         <div className="flex items-center gap-2 mb-4 flex-wrap">
-          <span className="text-sm font-semibold text-gray-700">FROM:</span>
-          <input
-            id="from-date"
-            type="date"
-            data-ocid="reports.from_date.input"
-            value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            className="border border-gray-300 rounded px-2 py-1 text-sm"
-          />
-          <span className="text-gray-500 font-bold">→</span>
-          <span className="text-sm font-semibold text-gray-700">TO:</span>
-          <input
-            id="to-date"
-            type="date"
-            data-ocid="reports.to_date.input"
-            value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
-            className="border border-gray-300 rounded px-2 py-1 text-sm"
-          />
+          {activeTab === "daily" ? (
+            <>
+              <span className="text-sm font-semibold text-gray-700">DATE:</span>
+              <input
+                type="date"
+                data-ocid="reports.selected_date.input"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="border border-gray-300 rounded px-2 py-1 text-sm"
+              />
+            </>
+          ) : (
+            <>
+              <span className="text-sm font-semibold text-gray-700">FROM:</span>
+              <input
+                type="date"
+                data-ocid="reports.from_date.input"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="border border-gray-300 rounded px-2 py-1 text-sm"
+              />
+              <span className="text-gray-500 font-bold">→</span>
+              <span className="text-sm font-semibold text-gray-700">TO:</span>
+              <input
+                type="date"
+                data-ocid="reports.to_date.input"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                className="border border-gray-300 rounded px-2 py-1 text-sm"
+              />
+            </>
+          )}
         </div>
 
+        {/* Buttons */}
         <div className="flex gap-3 mb-5">
           <button
             type="button"
@@ -280,212 +434,359 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
           </button>
         </div>
 
+        {/* Print area */}
         <div id="report-print-area" className="bg-white rounded shadow p-4">
-          <h1 className="text-center font-bold text-xl mb-1">
+          <h1 className="text-center font-bold text-xl mb-1 uppercase">
             S B C O BRICK FIELD
           </h1>
-          <h2 className="text-center font-bold text-base mb-1">
+          <h2 className="text-center font-bold text-base mb-1 uppercase">
             {reportTitle}
           </h2>
           <p className="text-center text-xs text-gray-500 mb-4">
-            {fromDate && toDate
-              ? `${fromDate}  →  ${toDate}`
-              : fromDate || toDate || ""}
+            {activeTab === "daily"
+              ? selectedDate
+                ? fmtDate(selectedDate)
+                : ""
+              : fromDate && toDate
+                ? `${fmtDate(fromDate)}  →  ${fmtDate(toDate)}`
+                : ""}
           </p>
 
-          {grouped.size === 0 ? (
-            <div className="text-center text-gray-400 py-10 text-sm">
-              কোনো ডেটা পাওয়া যায়নি
-            </div>
-          ) : (
-            Array.from(grouped.entries()).map(([vehicleNumber, rows]) => {
-              const vehicleLabourNames = new Set<string>();
-              for (const r of rows)
-                for (const l of r.labours || []) vehicleLabourNames.add(l.name);
-              const labourCols = Array.from(vehicleLabourNames);
-              const grandSum = rows.reduce(
-                (s, r) => s + (r.grandTotal || 0),
-                0,
-              );
-              const labourTotals = new Map<string, number>();
-              for (const r of rows)
-                for (const l of r.labours || [])
-                  labourTotals.set(
-                    l.name,
-                    (labourTotals.get(l.name) || 0) + l.amount,
-                  );
-              const labourLine = Array.from(labourTotals.entries())
-                .map(([n, a]) => `${n} ₹${a}`)
-                .join(" | ");
-
-              return (
-                <div key={vehicleNumber} className="mb-6">
-                  <div
-                    className="w-full font-bold px-3 py-2 mb-1 text-sm"
-                    style={{
-                      backgroundColor: "#fffde7",
-                      border: "1px solid #e0d000",
-                    }}
-                  >
-                    VEHICLE: {vehicleNumber}
-                  </div>
-
-                  <div className="overflow-x-auto">
-                    <table
-                      className="w-full"
-                      style={{ borderCollapse: "collapse", fontSize: "13px" }}
-                    >
-                      <thead>
-                        <tr
-                          style={{ backgroundColor: "#1b5e20", color: "white" }}
+          {activeTab === "daily" ? (
+            dailyGrouped.size === 0 ? (
+              <div className="text-center text-gray-400 py-10 text-sm">
+                {selectedDate ? "কোনো ডেটা পাওয়া যায়নি" : "তারিখ সিলেক্ট করুন"}
+              </div>
+            ) : (
+              (() => {
+                const globalLabourTotals = new Map<string, number>();
+                const sections = Array.from(dailyGrouped.entries()).map(
+                  ([vehicleNumber, rows]) => {
+                    const vLabours = new Set<string>();
+                    for (const r of rows)
+                      for (const name of r.loadingLabours || [])
+                        vLabours.add(name);
+                    const lCols = Array.from(vLabours);
+                    const grandSum = rows.reduce(
+                      (s, r) => s + (r.totalAmount || 0),
+                      0,
+                    );
+                    for (const r of rows) {
+                      const amt = r.perLabourAvg || 0;
+                      for (const name of r.loadingLabours || []) {
+                        globalLabourTotals.set(
+                          name,
+                          (globalLabourTotals.get(name) || 0) + amt,
+                        );
+                      }
+                    }
+                    return (
+                      <div key={vehicleNumber} className="mb-6">
+                        <div
+                          className="w-full font-bold px-3 py-2 mb-1 text-sm uppercase"
+                          style={{
+                            backgroundColor: "#fffde7",
+                            border: "1px solid #ccc000",
+                          }}
                         >
-                          <th
+                          VEHICLE: {vehicleNumber}
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table
+                            className="w-full"
                             style={{
-                              padding: "8px",
-                              border: "1px solid #ccc",
-                              textAlign: "left",
-                              fontWeight: "bold",
+                              borderCollapse: "collapse",
+                              fontSize: "13px",
                             }}
                           >
-                            ADDRESS
-                          </th>
-                          <th
-                            style={{
-                              padding: "8px",
-                              border: "1px solid #ccc",
-                              textAlign: "center",
-                              fontWeight: "bold",
-                            }}
-                          >
-                            QUANTITY
-                          </th>
-                          <th
-                            style={{
-                              padding: "8px",
-                              border: "1px solid #ccc",
-                              textAlign: "center",
-                              fontWeight: "bold",
-                            }}
-                          >
-                            RATE
-                          </th>
-                          {labourCols.map((name) => (
-                            <th
-                              key={name}
-                              style={{
-                                padding: "8px",
-                                border: "1px solid #ccc",
-                                textAlign: "center",
-                                fontWeight: "bold",
-                              }}
-                            >
-                              {name}
-                            </th>
-                          ))}
-                          <th
-                            style={{
-                              padding: "8px",
-                              border: "1px solid #ccc",
-                              textAlign: "center",
-                              fontWeight: "bold",
-                            }}
-                          >
-                            TOTAL
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {rows.map((r, i) => {
-                          const qty = (r.bricks || []).reduce(
-                            (s, b) => s + (b.quantity || 0),
-                            0,
-                          );
-                          const rate = (r.bricks || [])[0]?.rate ?? 0;
-                          const rowKey = `${vehicleNumber}-${r.date}-${r.customerName}-${i}`;
-                          return (
-                            <tr
-                              key={rowKey}
-                              style={{
-                                backgroundColor:
-                                  i % 2 === 0 ? "white" : "#f5f5f5",
-                              }}
-                            >
-                              <td
+                            <thead>
+                              <tr
                                 style={{
-                                  padding: "8px",
-                                  border: "1px solid #ccc",
-                                  textAlign: "left",
+                                  backgroundColor: "#1b5e20",
+                                  color: "white",
                                 }}
                               >
-                                {r.address || r.customerName || "-"}
-                              </td>
-                              <td
-                                style={{
-                                  padding: "8px",
-                                  border: "1px solid #ccc",
-                                  textAlign: "center",
-                                }}
-                              >
-                                {qty}
-                              </td>
-                              <td
-                                style={{
-                                  padding: "8px",
-                                  border: "1px solid #ccc",
-                                  textAlign: "center",
-                                }}
-                              >
-                                {rate}
-                              </td>
-                              {labourCols.map((name) => {
-                                const l = (r.labours || []).find(
-                                  (x) => x.name === name,
-                                );
-                                return (
-                                  <td
-                                    key={name}
+                                <th
+                                  style={{
+                                    padding: "8px",
+                                    border: "1px solid #999",
+                                    textAlign: "left",
+                                    fontWeight: "bold",
+                                    textTransform: "uppercase",
+                                  }}
+                                >
+                                  ADDRESS
+                                </th>
+                                <th
+                                  style={{
+                                    padding: "8px",
+                                    border: "1px solid #999",
+                                    textAlign: "center",
+                                    fontWeight: "bold",
+                                    textTransform: "uppercase",
+                                  }}
+                                >
+                                  QTY
+                                </th>
+                                <th
+                                  style={{
+                                    padding: "8px",
+                                    border: "1px solid #999",
+                                    textAlign: "center",
+                                    fontWeight: "bold",
+                                    textTransform: "uppercase",
+                                  }}
+                                >
+                                  RATE
+                                </th>
+                                {lCols.map((n) => (
+                                  <th
+                                    key={n}
                                     style={{
                                       padding: "8px",
-                                      border: "1px solid #ccc",
+                                      border: "1px solid #999",
                                       textAlign: "center",
+                                      fontWeight: "bold",
+                                      textTransform: "uppercase",
                                     }}
                                   >
-                                    {l ? `₹${l.amount}` : "-"}
-                                  </td>
+                                    {n.toUpperCase()}
+                                  </th>
+                                ))}
+                                {/* NO TOTAL COLUMN */}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {rows.map((r, i) => {
+                                const qty = (r.deliverItems || []).reduce(
+                                  (s, b) => s + (b.deliverQty || 0),
+                                  0,
+                                );
+                                const rate = r.ratePerThousand ?? 0;
+                                const perLabour = r.perLabourAvg || 0;
+                                return (
+                                  <tr
+                                    key={`${r.customerName}-${r.address}-${i}`}
+                                    style={{
+                                      backgroundColor:
+                                        i % 2 === 0 ? "white" : "#f5f5f5",
+                                    }}
+                                  >
+                                    <td
+                                      style={{
+                                        padding: "7px 8px",
+                                        border: "1px solid #bbb",
+                                        textAlign: "left",
+                                        textTransform: "uppercase",
+                                      }}
+                                    >
+                                      {r.address || r.customerName || "-"}
+                                    </td>
+                                    <td
+                                      style={{
+                                        padding: "7px 8px",
+                                        border: "1px solid #bbb",
+                                        textAlign: "center",
+                                      }}
+                                    >
+                                      {qty}
+                                    </td>
+                                    <td
+                                      style={{
+                                        padding: "7px 8px",
+                                        border: "1px solid #bbb",
+                                        textAlign: "center",
+                                      }}
+                                    >
+                                      {rate}
+                                    </td>
+                                    {lCols.map((name) => {
+                                      const inRow = (
+                                        r.loadingLabours || []
+                                      ).includes(name);
+                                      return (
+                                        <td
+                                          key={name}
+                                          style={{
+                                            padding: "7px 8px",
+                                            border: "1px solid #bbb",
+                                            textAlign: "center",
+                                          }}
+                                        >
+                                          {inRow
+                                            ? `₹${Math.round(perLabour)}`
+                                            : "-"}
+                                        </td>
+                                      );
+                                    })}
+                                    {/* NO TOTAL CELL */}
+                                  </tr>
                                 );
                               })}
-                              <td
-                                style={{
-                                  padding: "8px",
-                                  border: "1px solid #ccc",
-                                  textAlign: "center",
-                                  fontWeight: "bold",
-                                }}
-                              >
-                                ₹{r.grandTotal ?? 0}
-                              </td>
-                            </tr>
+                            </tbody>
+                            {/* NO COLUMN TOTAL TFOOT */}
+                          </table>
+                        </div>
+                        {/* Single GRAND TOTAL line */}
+                        <div
+                          className="text-center font-bold text-base mt-3 mb-1 uppercase"
+                          style={{ fontSize: "15px", letterSpacing: "0.5px" }}
+                        >
+                          GRAND TOTAL ₹{grandSum}
+                        </div>
+                      </div>
+                    );
+                  },
+                );
+                // Labour summary: single horizontal line, ALL CAPS, spaced
+                const summaryEntries = Array.from(globalLabourTotals.entries());
+                return (
+                  <>
+                    {sections}
+                    {summaryEntries.length > 0 && (
+                      <div
+                        className="labour-summary"
+                        style={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          justifyContent: "center",
+                          gap: "24px",
+                          fontWeight: 700,
+                          fontSize: "13px",
+                          color: "#1b5e20",
+                          textTransform: "uppercase",
+                          borderTop: "2px solid #ccc",
+                          paddingTop: "10px",
+                          marginTop: "8px",
+                          letterSpacing: "0.5px",
+                        }}
+                      >
+                        {summaryEntries.map(([n, a]) => (
+                          <span key={n}>
+                            {n.toUpperCase()} ₹{Math.round(a)}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                );
+              })()
+            )
+          ) : activeDates.length === 0 ? (
+            <div className="text-center text-gray-400 py-10 text-sm">
+              {fromDate && toDate
+                ? "কোনো ডেটা পাওয়া যায়নি"
+                : "তারিখ range সিলেক্ট করুন"}
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table
+                  className="w-full"
+                  style={{ borderCollapse: "collapse", fontSize: "13px" }}
+                >
+                  <thead>
+                    <tr style={{ backgroundColor: "#1b5e20", color: "white" }}>
+                      <th
+                        style={{
+                          padding: "8px",
+                          border: "1px solid #999",
+                          textAlign: "left",
+                          fontWeight: "bold",
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        NAME
+                      </th>
+                      {activeDates.map((d) => (
+                        <th
+                          key={d}
+                          style={{
+                            padding: "8px",
+                            border: "1px solid #999",
+                            textAlign: "center",
+                            fontWeight: "bold",
+                          }}
+                        >
+                          {fmtDateShort(d)}
+                        </th>
+                      ))}
+                      {/* NO TOTAL COLUMN HEADER */}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allLabours.map((name, i) => (
+                      <tr
+                        key={name}
+                        style={{
+                          backgroundColor: i % 2 === 0 ? "white" : "#f5f5f5",
+                        }}
+                      >
+                        <td
+                          style={{
+                            padding: "7px 8px",
+                            border: "1px solid #bbb",
+                            fontWeight: 600,
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          {name.toUpperCase()}
+                        </td>
+                        {activeDates.map((date) => {
+                          const v = matrix.get(name)?.get(date);
+                          return (
+                            <td
+                              key={date}
+                              style={{
+                                padding: "7px 8px",
+                                border: "1px solid #bbb",
+                                textAlign: "center",
+                              }}
+                            >
+                              {v ? `₹${Math.round(v)}` : "-"}
+                            </td>
                           );
                         })}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <div className="text-center font-bold text-base mt-3 mb-1">
-                    GRAND TOTAL ₹{grandSum}
-                  </div>
-
-                  {labourLine && (
-                    <div
-                      className="text-sm text-gray-700 text-center mt-1 mb-2"
-                      style={{ fontWeight: 600 }}
-                    >
-                      {labourLine}
-                    </div>
-                  )}
+                        {/* NO TOTAL CELL */}
+                      </tr>
+                    ))}
+                  </tbody>
+                  {/* NO TFOOT — GRAND TOTAL shown separately below */}
+                </table>
+              </div>
+              {/* Single GRAND TOTAL line for weekly */}
+              <div
+                className="text-center font-bold uppercase mt-4 mb-3"
+                style={{ fontSize: "15px", letterSpacing: "0.5px" }}
+              >
+                GRAND TOTAL ₹{Math.round(overallTotal)}
+              </div>
+              {/* Labour summary: single horizontal line, ALL CAPS */}
+              {allLabours.length > 0 && (
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    justifyContent: "center",
+                    gap: "24px",
+                    fontWeight: 700,
+                    fontSize: "13px",
+                    color: "#1b5e20",
+                    textTransform: "uppercase",
+                    borderTop: "2px solid #ccc",
+                    paddingTop: "10px",
+                    letterSpacing: "0.5px",
+                  }}
+                >
+                  {allLabours.map((name) => (
+                    <span key={name}>
+                      {name.toUpperCase()} ₹
+                      {Math.round(labourTotals.get(name) || 0)}
+                    </span>
+                  ))}
                 </div>
-              );
-            })
+              )}
+            </>
           )}
         </div>
       </div>

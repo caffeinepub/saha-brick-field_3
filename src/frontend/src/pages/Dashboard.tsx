@@ -21,6 +21,8 @@ type Props = {
   orders: Order[];
   deliveries: Delivery[];
   pendingDeliveriesCount?: number;
+  completeDeliveriesCount?: number;
+  onGoCompleteDelivery?: () => void;
   onCompleteDelivery: (id: string) => void;
   onGoTotalOrders: () => void;
   onGoPendingDelivery?: () => void;
@@ -32,9 +34,11 @@ export default function Dashboard({
   orders,
   deliveries,
   pendingDeliveriesCount,
+  completeDeliveriesCount,
   onCompleteDelivery,
   onGoTotalOrders,
   onGoPendingDelivery,
+  onGoCompleteDelivery,
   onGoSettings,
   onGoReports,
 }: Props) {
@@ -95,10 +99,10 @@ export default function Dashboard({
     {
       id: "complete-delivery",
       label: "COMPLETE DELIVERY",
-      value: completeDelivery,
+      value: completeDeliveriesCount ?? completeDelivery,
       Icon: Package,
       clickable: true,
-      modal: "complete",
+      onClickOverride: onGoCompleteDelivery ?? (() => setModal("complete")),
     },
     {
       id: "total-due-amount",
