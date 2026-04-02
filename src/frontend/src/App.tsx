@@ -2,6 +2,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { useEffect, useState } from "react";
 import BottomNav from "./components/BottomNav";
 import AddOrder from "./pages/AddOrder";
+import ClosedOrdersPage from "./pages/ClosedOrdersPage";
 import CompleteDeliveryFormPage from "./pages/CompleteDeliveryFormPage";
 import CompleteDeliveryListPage from "./pages/CompleteDeliveryListPage";
 import Dashboard from "./pages/Dashboard";
@@ -124,7 +125,8 @@ export type Page =
   | "pending-order"
   | "pending-delivery"
   | "complete-delivery-form"
-  | "complete-delivery";
+  | "complete-delivery"
+  | "closed-orders";
 
 function loadFromStorage<T>(key: string, fallback: T): T {
   try {
@@ -235,6 +237,7 @@ export default function App() {
     );
   };
 
+  // biome-ignore lint/correctness/noUnusedVariables: kept for potential future use
   const addDelivery = (delivery: Omit<Delivery, "id" | "createdAt">) => {
     setDeliveries((prev) => [
       ...prev,
@@ -379,7 +382,7 @@ export default function App() {
             onGoCompleteDelivery={() => setPage("complete-delivery")}
             onGoSettings={() => setPage("settings")}
             onGoReports={() => setPage("reports")}
-            closedOrders={closedOrders}
+            onGoClosedOrders={() => setPage("closed-orders")}
           />
         )}
         {page === "add-order" && (
@@ -387,8 +390,8 @@ export default function App() {
         )}
         {page === "direct-delivery" && (
           <DirectDelivery
-            onSubmit={addDelivery}
             onBack={() => setPage("dashboard")}
+            vehicles={vehicles}
           />
         )}
         {page === "total-orders" && (
@@ -448,6 +451,15 @@ export default function App() {
             deliveries={completeDeliveries}
             onBack={() => setPage("dashboard")}
             onDelete={deleteCompleteDelivery}
+          />
+        )}
+        {page === "closed-orders" && (
+          <ClosedOrdersPage
+            orders={closedOrders}
+            onBack={() => setPage("dashboard")}
+            onDelete={(id) =>
+              setOrders((prev) => prev.filter((o) => o.id !== id))
+            }
           />
         )}
         {page === "settings" && (

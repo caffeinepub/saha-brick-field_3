@@ -27,7 +27,7 @@ type Props = {
   onGoPendingDelivery?: () => void;
   onGoSettings: () => void;
   onGoReports?: () => void;
-  closedOrders?: Order[];
+  onGoClosedOrders?: () => void;
 };
 
 export default function Dashboard({
@@ -41,13 +41,12 @@ export default function Dashboard({
   onGoCompleteDelivery,
   onGoSettings,
   onGoReports,
-  closedOrders = [],
+  onGoClosedOrders,
 }: Props) {
   const [modal, setModal] = useState<Modal>(null);
-  const [showClosedOrders, setShowClosedOrders] = useState(false);
 
   const totalOrders = orders.filter((o) => o.status === "open").length;
-  const closedOrdersCount = closedOrders.length;
+  const closedOrdersCount = orders.filter((o) => o.status === "closed").length;
   const pendingDelivery = deliveries.filter(
     (d) => d.status === "pending",
   ).length;
@@ -92,7 +91,7 @@ export default function Dashboard({
       value: closedOrdersCount,
       Icon: CheckCircle,
       clickable: true,
-      onClickOverride: () => setShowClosedOrders((v) => !v),
+      onClickOverride: onGoClosedOrders,
     },
     {
       id: "pending-delivery",
@@ -155,7 +154,6 @@ export default function Dashboard({
                   ? () => setModal(card.modal!)
                   : undefined
               : undefined;
-            const isActive = card.id === "closed-orders" && showClosedOrders;
             return (
               <div
                 key={card.id}
@@ -174,7 +172,7 @@ export default function Dashboard({
                   card.clickable
                     ? "cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all"
                     : "cursor-default"
-                } ${isActive ? "ring-2 ring-[oklch(0.35_0.1_145)]" : ""}`}
+                }`}
               >
                 <div className="w-10 h-10 rounded-full bg-[oklch(0.88_0.07_145)] flex items-center justify-center">
                   <card.Icon
@@ -195,38 +193,6 @@ export default function Dashboard({
             );
           })}
         </div>
-
-        {showClosedOrders && (
-          <div className="mt-3" data-ocid="closed_orders.panel">
-            <div className="bg-[#1a3c2a] text-white px-4 py-3 rounded-t-xl flex items-center justify-between">
-              <h2 className="text-sm font-extrabold uppercase tracking-widest">
-                CLOSED ORDERS
-              </h2>
-              <div className="w-7 h-7 rounded-full bg-[#2e5c40] flex items-center justify-center text-white font-bold text-xs">
-                {closedOrders.length}
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2 bg-[#edf5ed] p-3 rounded-b-xl">
-              {closedOrders.length === 0 ? (
-                <div
-                  className="text-center text-gray-400 py-10 bg-white rounded-xl text-sm"
-                  data-ocid="closed_orders.empty_state"
-                >
-                  কোনো বন্ধ অর্ডার নেই
-                </div>
-              ) : (
-                closedOrders.map((order, idx) => (
-                  <ClosedOrderCard
-                    key={order.id}
-                    order={order}
-                    index={idx + 1}
-                  />
-                ))
-              )}
-            </div>
-          </div>
-        )}
       </main>
 
       <footer className="text-center text-xs text-muted-foreground py-3 pb-4">
@@ -254,70 +220,6 @@ export default function Dashboard({
           onClose={() => setModal(null)}
         />
       )}
-    </div>
-  );
-}
-
-function ClosedOrderCard({
-  order,
-  index,
-}: {
-  order: Order;
-  index: number;
-}) {
-  return (
-    <div
-      className="bg-white rounded-xl shadow-sm overflow-hidden"
-      data-ocid={`closed_orders.item.${index}`}
-    >
-      <div className="p-3">
-        <div className="flex items-start justify-between mb-1">
-          <span className="font-extrabold text-base text-gray-900">
-            {order.customerName}
-          </span>
-          <span className="text-[10px] font-bold tracking-wider bg-[#edf5ed] text-[#1a3c2a] border border-[#c5dfc5] rounded-full px-2 py-0.5 uppercase">
-            CLOSED
-          </span>
-        </div>
-
-        {order.address && (
-          <div className="text-xs text-gray-500 mb-2">{order.address}</div>
-        )}
-
-        <div className="flex items-center gap-3 flex-wrap mb-2">
-          <div className="flex items-center gap-1 text-xs text-gray-700">
-            <span>📅</span>
-            <span className="font-semibold">{order.orderDate}</span>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-3 divide-x divide-gray-100 border border-gray-100 rounded-xl overflow-hidden">
-          {[
-            {
-              label: "TOTAL",
-              value: `₹${order.totalAmount.toLocaleString()}`,
-              color: "text-gray-900",
-            },
-            {
-              label: "PAID",
-              value: `₹${order.paidAmount.toLocaleString()}`,
-              color: "text-green-600",
-            },
-            {
-              label: "BRICKS",
-              value: order.totalBricks.toLocaleString(),
-              color: "text-gray-700",
-            },
-          ].map(({ label, value, color }) => (
-            <div key={label} className="flex flex-col items-center py-2">
-              <span className="text-[9px] font-bold tracking-wider text-gray-400 uppercase">
-                {label}
-              </span>
-              <span className={`text-sm font-extrabold ${color}`}>{value}</span>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }
