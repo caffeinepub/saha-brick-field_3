@@ -10,6 +10,20 @@ import { useState } from "react";
 import { toast } from "sonner";
 import type { PendingDelivery } from "../App";
 
+declare const window: Window & {
+  jspdf: {
+    jsPDF: new (opts: {
+      unit: string;
+      format: string;
+      orientation?: string;
+    }) => any;
+  };
+  html2canvas: (
+    element: HTMLElement,
+    options?: any,
+  ) => Promise<HTMLCanvasElement>;
+};
+
 type Props = {
   deliveries: PendingDelivery[];
   onBack: () => void;
@@ -50,6 +64,132 @@ export default function PendingDeliveryPage({
       return matchSearch && matchDate;
     });
 
+  function buildPrintHtml() {
+    const today = new Date().toLocaleDateString("en-GB");
+    let rows = "";
+    for (const d of displayed) {
+      const items = (d.deliverItems || [])
+        .map((i) => `${i.type}: ${i.deliverQty.toLocaleString()}`)
+        .join(", ");
+      rows += `<tr>
+        <td>${d.customerName}</td>
+        <td>${d.address || "-"}</td>
+        <td>${d.pendingDate || "-"}</td>
+        <td>${d.locationType?.toUpperCase() || "-"}</td>
+        <td>${items || "-"}</td>
+        <td>${d.phone || "-"}</td>
+      </tr>`;
+    }
+    return `<html><head><title>PENDING DELIVERY</title><style>
+      @import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&display=swap');
+      body{font-family:'Noto Sans',Arial,sans-serif;margin:20px;font-size:13px;}
+      h1{text-align:center;font-size:18px;font-weight:bold;margin:0;text-transform:uppercase;}
+      h2{text-align:center;font-size:14px;font-weight:bold;margin:4px 0;text-transform:uppercase;}
+      p.date-line{text-align:center;font-size:11px;color:#555;margin-bottom:16px;}
+      table{width:100%;border-collapse:collapse;margin-top:8px;}
+      th{background:#1b5e20;color:white;font-weight:bold;padding:8px;text-align:left;border:1px solid #999;text-transform:uppercase;font-size:12px;}
+      td{border:1px solid #bbb;padding:7px 8px;font-size:12px;vertical-align:top;}
+      tr:nth-child(even) td{background:#f5f5f5;}
+      @media print{@page{size:A4;margin:15mm;}}
+    </style></head><body>
+      <h1>S B C O BRICK FIELD</h1>
+      <h2>PENDING DELIVERY</h2>
+      <p class="date-line">Generated: ${today} &nbsp;|&nbsp; Total: ${displayed.length}</p>
+      <table>
+        <thead><tr>
+          <th>CUSTOMER NAME</th><th>ADDRESS</th><th>DATE</th><th>LOCATION</th><th>ITEMS</th><th>PHONE</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </body></html>`;
+  }
+
+  function handlePrint() {
+    const win = window.open("", "", "width=900,height=700");
+    if (!win) return;
+    win.document.write(buildPrintHtml());
+    win.document.close();
+    setTimeout(() => win.print(), 300);
+  }
+
+  async function handleDownloadPdf() {
+    if (!window.jspdf || !window.html2canvas) {
+      alert("PDF library not loaded. Please check your internet connection.");
+      return;
+    }
+    const container = document.createElement("div");
+    container.style.cssText =
+      "position:fixed;left:-9999px;top:0;width:800px;background:white;padding:20px;font-family:Arial,sans-serif;font-size:13px;";
+    const today = new Date().toLocaleDateString("en-GB");
+    const rows = displayed
+      .map((d) => {
+        const items = (d.deliverItems || [])
+          .map((i) => `${i.type}: ${i.deliverQty.toLocaleString()}`)
+          .join(", ");
+        return `<tr>
+        <td style="border:1px solid #bbb;padding:6px 8px;">${d.customerName}</td>
+        <td style="border:1px solid #bbb;padding:6px 8px;">${d.address || "-"}</td>
+        <td style="border:1px solid #bbb;padding:6px 8px;">${d.pendingDate || "-"}</td>
+        <td style="border:1px solid #bbb;padding:6px 8px;">${d.locationType?.toUpperCase() || "-"}</td>
+        <td style="border:1px solid #bbb;padding:6px 8px;">${items || "-"}</td>
+      </tr>`;
+      })
+      .join("");
+    container.innerHTML = `
+      <h1 style="text-align:center;font-size:18px;font-weight:bold;margin:0;text-transform:uppercase;">S B C O BRICK FIELD</h1>
+      <h2 style="text-align:center;font-size:14px;font-weight:bold;margin:4px 0 2px;text-transform:uppercase;">PENDING DELIVERY</h2>
+      <p style="text-align:center;font-size:11px;color:#555;margin-bottom:14px;">Generated: ${today} | Total: ${displayed.length}</p>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead><tr style="background:#1b5e20;color:white;">
+          <th style="border:1px solid #999;padding:7px 8px;text-align:left;">CUSTOMER NAME</th>
+          <th style="border:1px solid #999;padding:7px 8px;text-align:left;">ADDRESS</th>
+          <th style="border:1px solid #999;padding:7px 8px;text-align:left;">DATE</th>
+          <th style="border:1px solid #999;padding:7px 8px;text-align:left;">LOCATION</th>
+          <th style="border:1px solid #999;padding:7px 8px;text-align:left;">ITEMS</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+    document.body.appendChild(container);
+    const canvas = await window.html2canvas(container, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: "#ffffff",
+    });
+    document.body.removeChild(container);
+    const imgData = canvas.toDataURL("image/png");
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({
+      unit: "mm",
+      format: "a4",
+      orientation: "portrait",
+    });
+    const margin = 10;
+    const pageWidth = 210;
+    const pageHeight = 297;
+    const contentWidth = pageWidth - margin * 2;
+    const imgAspect = canvas.height / canvas.width;
+    const totalImgHeight = contentWidth * imgAspect;
+    const contentHeight = pageHeight - margin * 2;
+    let renderedHeight = 0;
+    let pageNum = 0;
+    while (renderedHeight < totalImgHeight) {
+      if (pageNum > 0) doc.addPage();
+      doc.addImage(
+        imgData,
+        "PNG",
+        margin,
+        margin - renderedHeight,
+        contentWidth,
+        totalImgHeight,
+      );
+      renderedHeight += contentHeight;
+      pageNum++;
+      if (pageNum > 20) break;
+    }
+    const dateStr = new Date().toISOString().slice(0, 10);
+    doc.save(`pending-delivery-${dateStr}.pdf`);
+  }
+
   return (
     <div className="flex flex-col flex-1 pb-16 bg-[#edf5ed] min-h-screen">
       <header className="bg-[#1a3c2a] text-white px-4 py-3 flex items-center justify-between">
@@ -64,12 +204,14 @@ export default function PendingDeliveryPage({
         <div className="flex items-center gap-2">
           <button
             type="button"
+            onClick={handlePrint}
             className="w-8 h-8 rounded-full bg-[#2e5c40] flex items-center justify-center hover:bg-[#3a7050]"
           >
             <Printer size={15} />
           </button>
           <button
             type="button"
+            onClick={handleDownloadPdf}
             className="w-8 h-8 rounded-full bg-[#2e5c40] flex items-center justify-center hover:bg-[#3a7050]"
           >
             <Download size={15} />
