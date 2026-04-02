@@ -213,7 +213,10 @@ function OrderCard({
               {order.customerName}
             </span>
             {showPurpleDot && (
-              <span className="inline-block w-4 h-4 rounded-full bg-purple-500 shadow-md" />
+              <span className="relative inline-flex items-center justify-center w-4 h-4 flex-shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75" />
+                <span className="relative inline-flex rounded-full w-3 h-3 bg-purple-600" />
+              </span>
             )}
           </div>
           <div className="flex items-center gap-1.5">

@@ -150,9 +150,6 @@ export default function PendingDeliveryPage({
                     <div className="font-extrabold text-lg text-gray-900 leading-tight">
                       {d.customerName}
                     </div>
-                    {d.approxDeliveryDate && d.approxDeliveryDate !== "" && (
-                      <span className="inline-block w-4 h-4 rounded-full bg-purple-500 shadow-md flex-shrink-0" />
-                    )}
                   </div>
                   <div className="text-xs text-gray-500 mt-0.5">
                     {d.address && d.address}
