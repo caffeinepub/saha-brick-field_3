@@ -175,6 +175,7 @@ export default function CompleteDeliveryFormPage({
       deliverItems: delivery.deliverItems,
       dueAmount: delivery.dueAmount,
       ratePerThousand: rate,
+      batsRate,
       totalAmount,
       totalLabours,
       perLabourAvg,

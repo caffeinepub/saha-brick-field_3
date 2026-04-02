@@ -98,6 +98,7 @@ export type CompleteDelivery = {
   deliverItems: { type: string; deliverQty: number }[];
   dueAmount: number;
   ratePerThousand: number;
+  batsRate?: number;
   totalAmount: number;
   totalLabours: number;
   perLabourAvg: number;

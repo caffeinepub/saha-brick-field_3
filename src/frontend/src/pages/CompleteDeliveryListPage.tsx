@@ -1,3 +1,5 @@
+import html2canvas from "html2canvas";
+import { jsPDF } from "jspdf";
 import {
   ArrowLeft,
   Calendar,
@@ -58,34 +60,49 @@ export default function CompleteDeliveryListPage({
       const dateStr = d.deliveryDate
         ? new Date(d.deliveryDate).toLocaleDateString("en-GB")
         : "-";
-      rows += `<tr>
-        <td>${d.customerName}</td>
-        <td>${d.address || "-"}</td>
-        <td>${dateStr}</td>
-        <td>${d.vehicleType || "-"} ${d.vehicleNumber || ""}</td>
-        <td>${items || "-"}</td>
-        <td>${d.ratePerThousand || "-"}</td>
-        <td>${labours || "-"}</td>
+      const rowClass = displayed.indexOf(d) % 2 === 1 ? ' class="even"' : "";
+      rows += `<tr${rowClass}>
+        <td class="left">${d.customerName}</td>
+        <td class="left">${d.address || "-"}</td>
+        <td class="left">${dateStr}</td>
+        <td class="left">${d.vehicleType || "-"} ${d.vehicleNumber || ""}</td>
+        <td class="left">${items || "-"}</td>
+        <td class="right">${d.ratePerThousand || "-"}</td>
+        <td class="left">${labours || "-"}</td>
       </tr>`;
     }
     return `<html><head><title>COMPLETE DELIVERY</title><style>
       @import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&display=swap');
-      body{font-family:'Noto Sans',Arial,sans-serif;margin:20px;font-size:12px;}
-      h1{text-align:center;font-size:18px;font-weight:bold;margin:0;text-transform:uppercase;}
-      h2{text-align:center;font-size:14px;font-weight:bold;margin:4px 0;text-transform:uppercase;}
-      p.date-line{text-align:center;font-size:11px;color:#555;margin-bottom:16px;}
-      table{width:100%;border-collapse:collapse;margin-top:8px;}
-      th{background:#000000;color:white;font-weight:bold;padding:7px 8px;text-align:left;border:1px solid #999;text-transform:uppercase;font-size:11px;}
-      td{border:1px solid #bbb;padding:6px 8px;font-size:11px;vertical-align:top;}
-      tr:nth-child(even) td{background:#f5f5f5;}
-      @media print{@page{size:A4 landscape;margin:10mm;}}
+      @page{size:A4;margin:10mm;}
+      *{box-sizing:border-box;}
+      body{font-family:'Noto Sans',Arial,sans-serif;margin:0;padding:10mm;font-size:12px;color:#000;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+      h1{text-align:center;font-size:18px;font-weight:bold;margin:0 0 4px;text-transform:uppercase;}
+      h2{text-align:center;font-size:14px;font-weight:bold;margin:0 0 4px;text-transform:uppercase;}
+      p.date-line{text-align:center;font-size:11px;color:#555;margin:0 0 14px;}
+      .section{margin-bottom:20px;page-break-inside:avoid;}
+      .vehicle-label{background:#000!important;color:#fff!important;font-weight:bold;padding:6px 10px;font-size:12px;text-transform:uppercase;margin-bottom:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+      table{width:100%;border-collapse:collapse;margin-bottom:0;}
+      thead{display:table-header-group;}
+      tbody tr{page-break-inside:avoid;}
+      th{background:#000!important;color:#fff!important;font-weight:bold;padding:8px 10px;font-size:12px;border:1px solid #333;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+      th.left{text-align:left;}
+      th.right{text-align:right;}
+      th.center{text-align:center;}
+      td{border:1px solid #ccc;padding:6px 8px;font-size:11px;vertical-align:top;color:#000;}
+      td.left{text-align:left;}
+      td.right{text-align:right;}
+      td.center{text-align:center;}
+      tr.even td{background:#f4f4f4!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+      .grand-total{text-align:center;font-weight:bold;font-size:14px;margin:10px 0 6px;text-transform:uppercase;border-top:2px solid #000;padding-top:8px;}
+      .labour-summary{display:flex;flex-wrap:wrap;justify-content:center;gap:20px;font-weight:700;font-size:12px;text-transform:uppercase;border-top:1px solid #ccc;padding:8px 0;letter-spacing:0.5px;}
+      @media print{@page{size:A4;margin:10mm;}body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}.section{page-break-inside:avoid;}tbody tr{page-break-inside:avoid;}th{background:#000!important;color:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}tr.even td{background:#f4f4f4!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}.vehicle-label{background:#000!important;color:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
     </style></head><body>
       <h1>S B C O BRICK FIELD</h1>
       <h2>COMPLETE DELIVERY</h2>
       <p class="date-line">Generated: ${today} &nbsp;|&nbsp; Total: ${displayed.length}</p>
       <table>
         <thead><tr>
-          <th>CUSTOMER</th><th>ADDRESS</th><th>DATE</th><th>VEHICLE</th><th>ITEMS</th><th>RATE</th><th>LABOURS</th>
+          <th class="left">CUSTOMER</th><th class="left">ADDRESS</th><th class="left">DATE</th><th class="left">VEHICLE</th><th class="left">ITEMS</th><th class="right">RATE</th><th class="left">LABOURS</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
@@ -101,86 +118,94 @@ export default function CompleteDeliveryListPage({
   }
 
   async function handleDownloadPdf() {
-    const container = document.createElement("div");
-    container.style.cssText =
-      "position:fixed;left:-9999px;top:0;width:900px;background:white;padding:20px;font-family:Arial,sans-serif;font-size:12px;";
-    const today = new Date().toLocaleDateString("en-GB");
-    const rows = displayed
-      .map((d) => {
-        const items = (d.deliverItems || [])
-          .map((i) => `${i.type}: ${i.deliverQty.toLocaleString()}`)
-          .join(", ");
-        const labours = Array.from(
-          new Set([...(d.loadingLabours || []), ...(d.unloadingLabours || [])]),
-        ).join(", ");
-        const dateStr = d.deliveryDate
-          ? new Date(d.deliveryDate).toLocaleDateString("en-GB")
-          : "-";
-        return `<tr>
-        <td style="border:1px solid #bbb;padding:5px 7px;">${d.customerName}</td>
-        <td style="border:1px solid #bbb;padding:5px 7px;">${d.address || "-"}</td>
-        <td style="border:1px solid #bbb;padding:5px 7px;">${dateStr}</td>
-        <td style="border:1px solid #bbb;padding:5px 7px;">${d.vehicleType || "-"} ${d.vehicleNumber || ""}</td>
-        <td style="border:1px solid #bbb;padding:5px 7px;">${items || "-"}</td>
-        <td style="border:1px solid #bbb;padding:5px 7px;text-align:center;">${d.ratePerThousand || "-"}</td>
-        <td style="border:1px solid #bbb;padding:5px 7px;">${labours || "-"}</td>
-      </tr>`;
-      })
-      .join("");
-    container.innerHTML = `
-      <h1 style="text-align:center;font-size:18px;font-weight:bold;margin:0;text-transform:uppercase;">S B C O BRICK FIELD</h1>
-      <h2 style="text-align:center;font-size:14px;font-weight:bold;margin:4px 0 2px;text-transform:uppercase;">COMPLETE DELIVERY</h2>
-      <p style="text-align:center;font-size:11px;color:#555;margin-bottom:14px;">Generated: ${today} | Total: ${displayed.length}</p>
-      <table style="width:100%;border-collapse:collapse;font-size:11px;">
-        <thead><tr style="background:#000000;color:white;">
-          <th style="border:1px solid #999;padding:7px 8px;text-align:left;">CUSTOMER</th>
-          <th style="border:1px solid #999;padding:7px 8px;text-align:left;">ADDRESS</th>
-          <th style="border:1px solid #999;padding:7px 8px;text-align:left;">DATE</th>
-          <th style="border:1px solid #999;padding:7px 8px;text-align:left;">VEHICLE</th>
-          <th style="border:1px solid #999;padding:7px 8px;text-align:left;">ITEMS</th>
-          <th style="border:1px solid #999;padding:7px 8px;text-align:center;">RATE</th>
-          <th style="border:1px solid #999;padding:7px 8px;text-align:left;">LABOURS</th>
-        </tr></thead>
-        <tbody>${rows}</tbody>
-      </table>`;
-    document.body.appendChild(container);
-    const canvas = await (window as any).html2canvas(container, {
-      scale: 3,
-      useCORS: true,
-      backgroundColor: "#ffffff",
-    });
-    document.body.removeChild(container);
-    const imgData = canvas.toDataURL("image/png");
-    const doc = new (window as any).jspdf.jsPDF({
-      unit: "mm",
-      format: "a4",
-      orientation: "landscape",
-    });
-    const margin = 10;
-    const pageWidth = 297;
-    const pageHeight = 210;
-    const contentWidth = pageWidth - margin * 2;
-    const imgAspect = canvas.height / canvas.width;
-    const totalImgHeight = contentWidth * imgAspect;
-    const contentHeight = pageHeight - margin * 2;
-    let renderedHeight = 0;
-    let pageNum = 0;
-    while (renderedHeight < totalImgHeight) {
-      if (pageNum > 0) doc.addPage();
-      doc.addImage(
-        imgData,
-        "PNG",
-        margin,
-        margin - renderedHeight,
-        contentWidth,
-        totalImgHeight,
-      );
-      renderedHeight += contentHeight;
-      pageNum++;
-      if (pageNum > 20) break;
+    try {
+      const container = document.createElement("div");
+      container.style.cssText =
+        "position:fixed;left:-9999px;top:0;width:1000px;background:white;padding:20px;font-family:'Noto Sans',Arial,sans-serif;font-size:12px;";
+      const today = new Date().toLocaleDateString("en-GB");
+      const rows = displayed
+        .map((d) => {
+          const items = (d.deliverItems || [])
+            .map((i) => `${i.type}: ${i.deliverQty.toLocaleString()}`)
+            .join(", ");
+          const labours = Array.from(
+            new Set([
+              ...(d.loadingLabours || []),
+              ...(d.unloadingLabours || []),
+            ]),
+          ).join(", ");
+          const dateStr = d.deliveryDate
+            ? new Date(d.deliveryDate).toLocaleDateString("en-GB")
+            : "-";
+          const bg = displayed.indexOf(d) % 2 === 1 ? "#f4f4f4" : "#fff";
+          return `<tr style="background:${bg};">
+          <td style="border:1px solid #ccc;padding:6px 8px;text-align:left;">${d.customerName}</td>
+          <td style="border:1px solid #ccc;padding:6px 8px;text-align:left;">${d.address || "-"}</td>
+          <td style="border:1px solid #ccc;padding:6px 8px;text-align:left;">${dateStr}</td>
+          <td style="border:1px solid #ccc;padding:6px 8px;text-align:left;">${d.vehicleType || "-"} ${d.vehicleNumber || ""}</td>
+          <td style="border:1px solid #ccc;padding:6px 8px;text-align:left;">${items || "-"}</td>
+          <td style="border:1px solid #ccc;padding:6px 8px;text-align:right;">${d.ratePerThousand || "-"}</td>
+          <td style="border:1px solid #ccc;padding:6px 8px;text-align:left;">${labours || "-"}</td>
+        </tr>`;
+        })
+        .join("");
+      container.innerHTML = `
+        <h1 style="text-align:center;font-size:18px;font-weight:bold;margin:0 0 4px;text-transform:uppercase;">S B C O BRICK FIELD</h1>
+        <h2 style="text-align:center;font-size:14px;font-weight:bold;margin:0 0 4px;text-transform:uppercase;">COMPLETE DELIVERY</h2>
+        <p style="text-align:center;font-size:11px;color:#555;margin:0 0 14px;">Generated: ${today} | Total: ${displayed.length}</p>
+        <table style="width:100%;border-collapse:collapse;font-size:11px;">
+          <thead><tr style="background:#000000;color:white;-webkit-print-color-adjust:exact;">
+            <th style="border:1px solid #333;padding:8px 10px;text-align:left;font-weight:bold;text-transform:uppercase;background:#000;color:#fff;-webkit-print-color-adjust:exact;">CUSTOMER</th>
+            <th style="border:1px solid #333;padding:8px 10px;text-align:left;font-weight:bold;text-transform:uppercase;background:#000;color:#fff;-webkit-print-color-adjust:exact;">ADDRESS</th>
+            <th style="border:1px solid #333;padding:8px 10px;text-align:left;font-weight:bold;text-transform:uppercase;background:#000;color:#fff;-webkit-print-color-adjust:exact;">DATE</th>
+            <th style="border:1px solid #333;padding:8px 10px;text-align:left;font-weight:bold;text-transform:uppercase;background:#000;color:#fff;-webkit-print-color-adjust:exact;">VEHICLE</th>
+            <th style="border:1px solid #333;padding:8px 10px;text-align:left;font-weight:bold;text-transform:uppercase;background:#000;color:#fff;-webkit-print-color-adjust:exact;">ITEMS</th>
+            <th style="border:1px solid #333;padding:8px 10px;text-align:right;font-weight:bold;text-transform:uppercase;background:#000;color:#fff;-webkit-print-color-adjust:exact;">RATE</th>
+            <th style="border:1px solid #333;padding:8px 10px;text-align:left;font-weight:bold;text-transform:uppercase;background:#000;color:#fff;-webkit-print-color-adjust:exact;">LABOURS</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+      document.body.appendChild(container);
+      const canvas = await html2canvas(container, {
+        scale: 3,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+      });
+      document.body.removeChild(container);
+      const imgData = canvas.toDataURL("image/png");
+      const doc = new jsPDF({
+        unit: "mm",
+        format: "a4",
+        orientation: "portrait",
+      });
+      const margin = 10;
+      const pageWidth = 210;
+      const pageHeight = 297;
+      const contentWidth = pageWidth - margin * 2;
+      const imgAspect = canvas.height / canvas.width;
+      const totalImgHeight = contentWidth * imgAspect;
+      const contentHeight = pageHeight - margin * 2;
+      let renderedHeight = 0;
+      let pageNum = 0;
+      while (renderedHeight < totalImgHeight) {
+        if (pageNum > 0) doc.addPage();
+        doc.addImage(
+          imgData,
+          "PNG",
+          margin,
+          margin - renderedHeight,
+          contentWidth,
+          totalImgHeight,
+        );
+        renderedHeight += contentHeight;
+        pageNum++;
+        if (pageNum > 20) break;
+      }
+      const dateStr = new Date().toISOString().slice(0, 10);
+      doc.save(`complete-delivery-${dateStr}.pdf`);
+    } catch (err) {
+      console.error("PDF generation failed:", err);
     }
-    const dateStr = new Date().toISOString().slice(0, 10);
-    doc.save(`complete-delivery-${dateStr}.pdf`);
   }
 
   return (

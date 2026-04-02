@@ -1,3 +1,5 @@
+import html2canvas from "html2canvas";
+import { jsPDF } from "jspdf";
 import { ArrowLeft, Download, Printer } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { CompleteDelivery } from "../App";
@@ -163,20 +165,29 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
     if (!win) return;
     win.document.write(`<html><head><meta charset="UTF-8"><title>${reportTitle}</title><style>
       @import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&display=swap');
-      body{font-family:'Noto Sans',Arial,sans-serif;margin:20px;font-size:13px;}
-      h1{text-align:center;font-size:18px;font-weight:bold;margin:0;text-transform:uppercase;}
-      h2{text-align:center;font-size:14px;font-weight:bold;margin:4px 0;text-transform:uppercase;}
-      p.date-line{text-align:center;font-size:11px;color:#555;margin-bottom:12px;}
-      .vehicle-section{margin-bottom:25px;padding:10px;border:1px solid #ccc;border-radius:4px;}
-      table{width:100%;border-collapse:collapse;margin-bottom:6px;}
-      th{background:#000000;color:white;font-weight:bold;padding:9px 10px;font-size:14px;text-align:center;border:1px solid #999;text-transform:uppercase;}
+      @page{size:A4;margin:10mm;}
+      *{box-sizing:border-box;}
+      body{font-family:'Noto Sans',Arial,sans-serif;margin:0;padding:10mm;font-size:12px;color:#000;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+      h1{text-align:center;font-size:18px;font-weight:bold;margin:0 0 4px;text-transform:uppercase;}
+      h2{text-align:center;font-size:14px;font-weight:bold;margin:0 0 4px;text-transform:uppercase;}
+      p.date-line{text-align:center;font-size:11px;color:#555;margin:0 0 14px;}
+      .section{margin-bottom:20px;page-break-inside:avoid;}
+      .vehicle-label{background:#000!important;color:#fff!important;font-weight:bold;padding:6px 10px;font-size:12px;text-transform:uppercase;margin-bottom:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+      table{width:100%;border-collapse:collapse;margin-bottom:0;}
+      thead{display:table-header-group;}
+      tbody tr{page-break-inside:avoid;}
+      th{background:#000!important;color:#fff!important;font-weight:bold;padding:8px 10px;font-size:12px;border:1px solid #333;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
       th.left{text-align:left;}
-      td{border:1px solid #ccc;padding:6px 8px;font-size:13px;font-family:'Noto Sans',Arial,sans-serif;}
-      tr:nth-child(even) td{background:#f5f5f5;}
-      .vehicle-box{background:#fffde7;border:1px solid #ccc000;font-weight:bold;padding:7px 10px;margin:0 0 4px 0;font-size:13px;text-transform:uppercase;}
-      .grand-total{text-align:center;font-weight:bold;font-size:15px;margin:10px 0 6px 0;text-transform:uppercase;}
-      .labour-summary{display:flex;flex-wrap:wrap;justify-content:center;gap:24px;font-size:13px;font-weight:700;margin:10px 0 16px 0;color:#000000;text-transform:uppercase;padding:8px 0;border-top:2px solid #ccc;letter-spacing:0.5px;}
-      @media print{@page{size:A4;margin:15mm;}}
+      th.right{text-align:right;}
+      th.center{text-align:center;}
+      td{border:1px solid #ccc;padding:6px 8px;font-size:11px;vertical-align:top;color:#000;}
+      td.left{text-align:left;}
+      td.right{text-align:right;}
+      td.center{text-align:center;}
+      tr.even td{background:#f4f4f4!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+      .grand-total{text-align:center;font-weight:bold;font-size:14px;margin:10px 0 6px;text-transform:uppercase;border-top:2px solid #000;padding-top:8px;}
+      .labour-summary{display:flex;flex-wrap:wrap;justify-content:center;gap:20px;font-weight:700;font-size:12px;text-transform:uppercase;border-top:1px solid #ccc;padding:8px 0;letter-spacing:0.5px;}
+      @media print{@page{size:A4;margin:10mm;}body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}.section{page-break-inside:avoid;}tbody tr{page-break-inside:avoid;}th{background:#000!important;color:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}tr.even td{background:#f4f4f4!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}.vehicle-label{background:#000!important;color:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
     </style></head><body>`);
     win.document.write(el.innerHTML);
     win.document.write("</body></html>");
@@ -187,10 +198,10 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
   // ── PDF ──────────────────────────────────────────────────────────────────
   function buildReportHtml(): string {
     const thBase =
-      "background:#000000;color:white;font-weight:bold;padding:9px 10px;font-size:14px;text-align:center;border:1px solid #999;text-transform:uppercase;";
+      "background:#000000;color:#fff;font-weight:bold;padding:8px 10px;font-size:12px;text-align:center;border:1px solid #333;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact;";
     const thLeft = `${thBase}text-align:left;`;
     const tdBase =
-      "border:1px solid #ccc;padding:6px 8px;font-size:13px;text-align:center;font-family:'Noto Sans',Arial,sans-serif;";
+      "border:1px solid #ccc;padding:6px 8px;font-size:11px;text-align:right;font-family:'Noto Sans',Arial,sans-serif;color:#000;";
     const tdLeft = `${tdBase}text-align:left;text-transform:uppercase;`;
 
     let html = `<h1 style="text-align:center;font-size:18px;font-weight:bold;margin:0;text-transform:uppercase;">S B C O BRICK FIELD</h1>
@@ -227,8 +238,8 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
             );
           }
         }
-        html += `<div style="margin-bottom:25px;padding:10px;border:1px solid #ccc;border-radius:4px;">
-<div style="background:#fffde7;border:1px solid #ccc000;font-weight:bold;padding:7px 10px;margin-bottom:4px;font-size:13px;text-transform:uppercase;">VEHICLE: ${vehicleNumber}</div>
+        html += `<div style="margin-bottom:20px;page-break-inside:avoid;border:1px solid #ccc;">
+<div style="background:#000000;color:#fff;font-weight:bold;padding:6px 10px;font-size:12px;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact;">VEHICLE: ${vehicleNumber}</div>
 <table style="border-collapse:collapse;width:100%;">
 <thead><tr>
 <th style="${thLeft}">ADDRESS</th>
@@ -242,10 +253,15 @@ ${lCols.map((n) => `<th style="${thBase}">${n.toUpperCase()}</th>`).join("")}
             (s, b) => s + (b.deliverQty || 0),
             0,
           );
-          const rate = r.ratePerThousand ?? 0;
+          const hasBatsItem = (r.deliverItems || []).some(
+            (i) => i.type === "Bats",
+          );
+          const rate = hasBatsItem
+            ? (r.batsRate ?? r.ratePerThousand ?? 0)
+            : (r.ratePerThousand ?? 0);
           const bd = r.labourBreakdown || {};
-          const bg = i % 2 === 0 ? "white" : "#f5f5f5";
-          html += `<tr style="background:${bg};">
+          const bg = i % 2 === 1 ? "#f4f4f4" : "#ffffff";
+          html += `<tr style="background:${bg};-webkit-print-color-adjust:exact;">
 <td style="${tdLeft}">${r.address || r.customerName || "-"}</td>
 <td style="${tdBase}">${qty}</td>
 <td style="${tdBase}">${rate}</td>
@@ -261,12 +277,12 @@ ${lCols
 </tr>`;
         });
         html += `</tbody></table>
-<div style="text-align:center;font-weight:bold;font-size:15px;margin:10px 0 6px;text-transform:uppercase;">GRAND TOTAL ₹${grandSum}</div>
+<div style="text-align:center;font-weight:bold;font-size:14px;margin:10px 0 6px;text-transform:uppercase;border-top:2px solid #000;padding-top:8px;">GRAND TOTAL ₹${grandSum}</div>
 </div>`;
       }
       const summaryEntries = Array.from(globalLabourTotals.entries());
       if (summaryEntries.length > 0) {
-        html += `<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:24px;font-weight:700;font-size:13px;color:#000000;text-transform:uppercase;border-top:2px solid #ccc;padding-top:10px;margin-top:8px;letter-spacing:0.5px;">
+        html += `<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:20px;font-weight:700;font-size:12px;color:#000000;text-transform:uppercase;border-top:1px solid #ccc;padding:8px 0;letter-spacing:0.5px;">
 ${summaryEntries.map(([n, a]) => `<span>${n.toUpperCase()} ₹${Math.round(a)}</span>`).join("")}
 </div>`;
       }
@@ -286,7 +302,7 @@ ${wDates.map((d) => `<th style="${thBase}">${fmtDateShort(d)}</th>`).join("")}
 </tr></thead>
 <tbody>`;
       wLabours.forEach((name, i) => {
-        const bg = i % 2 === 0 ? "white" : "#f5f5f5";
+        const bg = i % 2 === 1 ? "#f4f4f4" : "#ffffff";
         const lMap = wMatrix.get(name);
         const total = wLabourTotals.get(name) || 0;
         html += `<tr style="background:${bg};">
@@ -301,63 +317,67 @@ ${wDates
 </tr>`;
       });
       html += `</tbody></table>
-<div style="text-align:center;font-weight:bold;font-size:15px;margin:16px 0 6px;text-transform:uppercase;">GRAND TOTAL ₹${Math.round(wTotal)}</div>`;
+<div style="text-align:center;font-weight:bold;font-size:14px;margin:10px 0 6px;text-transform:uppercase;border-top:2px solid #000;padding-top:8px;">GRAND TOTAL ₹${Math.round(wTotal)}</div>`;
     }
     return html;
   }
 
   async function handleDownloadPdf() {
-    const fileName =
-      activeTab === "daily"
-        ? `daily-report-${fromDate || new Date().toISOString().slice(0, 10)}.pdf`
-        : `weekly-report-${toDate || new Date().toISOString().slice(0, 10)}.pdf`;
+    try {
+      const fileName =
+        activeTab === "daily"
+          ? `daily-report-${fromDate || new Date().toISOString().slice(0, 10)}.pdf`
+          : `weekly-report-${toDate || new Date().toISOString().slice(0, 10)}.pdf`;
 
-    const reportHtml = buildReportHtml();
+      const reportHtml = buildReportHtml();
 
-    const container = document.createElement("div");
-    container.style.cssText =
-      "position:fixed;left:-9999px;top:0;width:800px;background:white;padding:20px;font-family:'Noto Sans',Arial,sans-serif;font-size:13px;";
-    container.innerHTML = reportHtml;
-    document.body.appendChild(container);
+      const container = document.createElement("div");
+      container.style.cssText =
+        "position:fixed;left:-9999px;top:0;width:800px;background:white;padding:20px;font-family:'Noto Sans',Arial,sans-serif;font-size:13px;";
+      container.innerHTML = reportHtml;
+      document.body.appendChild(container);
 
-    const canvas = await (window as any).html2canvas(container, {
-      scale: 3,
-      useCORS: true,
-      backgroundColor: "#ffffff",
-      logging: false,
-    });
-    document.body.removeChild(container);
+      const canvas = await html2canvas(container, {
+        scale: 3,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        logging: false,
+      });
+      document.body.removeChild(container);
 
-    const imgData = canvas.toDataURL("image/png");
-    const doc = new (window as any).jspdf.jsPDF({
-      unit: "mm",
-      format: "a4",
-      orientation: "portrait",
-    });
-    const margin = 10;
-    const pageWidth = 210;
-    const pageHeight = 297;
-    const contentWidth = pageWidth - margin * 2;
-    const imgAspect = canvas.height / canvas.width;
-    const totalImgHeight = contentWidth * imgAspect;
-    const contentHeight = pageHeight - margin * 2;
-    let renderedHeight = 0;
-    let pageNum = 0;
-    while (renderedHeight < totalImgHeight) {
-      if (pageNum > 0) doc.addPage();
-      doc.addImage(
-        imgData,
-        "PNG",
-        margin,
-        margin - renderedHeight,
-        contentWidth,
-        totalImgHeight,
-      );
-      renderedHeight += contentHeight;
-      pageNum++;
-      if (pageNum > 20) break;
+      const imgData = canvas.toDataURL("image/png");
+      const doc = new jsPDF({
+        unit: "mm",
+        format: "a4",
+        orientation: "portrait",
+      });
+      const margin = 10;
+      const pageWidth = 210;
+      const pageHeight = 297;
+      const contentWidth = pageWidth - margin * 2;
+      const imgAspect = canvas.height / canvas.width;
+      const totalImgHeight = contentWidth * imgAspect;
+      const contentHeight = pageHeight - margin * 2;
+      let renderedHeight = 0;
+      let pageNum = 0;
+      while (renderedHeight < totalImgHeight) {
+        if (pageNum > 0) doc.addPage();
+        doc.addImage(
+          imgData,
+          "PNG",
+          margin,
+          margin - renderedHeight,
+          contentWidth,
+          totalImgHeight,
+        );
+        renderedHeight += contentHeight;
+        pageNum++;
+        if (pageNum > 20) break;
+      }
+      doc.save(fileName);
+    } catch (err) {
+      console.error("PDF generation failed:", err);
     }
-    doc.save(fileName);
   }
 
   const { activeDates, allLabours, matrix, labourTotals, overallTotal } =
@@ -531,16 +551,14 @@ ${wDates
                         className="vehicle-section"
                         style={{
                           marginBottom: "25px",
-                          padding: "10px",
-                          border: "1px solid #ccc",
-                          borderRadius: "4px",
                         }}
                       >
                         <div
-                          className="w-full font-bold px-3 py-2 mb-2 text-sm uppercase"
+                          className="w-full font-bold px-3 py-2 mb-0 text-sm uppercase"
                           style={{
                             backgroundColor: "#fffde7",
-                            border: "1px solid #ccc000",
+                            border: "2px solid #cccc00",
+                            marginBottom: "8px",
                           }}
                         >
                           VEHICLE: {vehicleNumber}
@@ -576,7 +594,12 @@ ${wDates
                                   (s, b) => s + (b.deliverQty || 0),
                                   0,
                                 );
-                                const rate = r.ratePerThousand ?? 0;
+                                const hasBatsItem = (r.deliverItems || []).some(
+                                  (i) => i.type === "Bats",
+                                );
+                                const rate = hasBatsItem
+                                  ? (r.batsRate ?? r.ratePerThousand ?? 0)
+                                  : (r.ratePerThousand ?? 0);
                                 const rowBreakdown = r.labourBreakdown || {};
                                 return (
                                   <tr
@@ -611,8 +634,13 @@ ${wDates
                           </table>
                         </div>
                         <div
-                          className="text-center font-bold text-base mt-3 mb-1 uppercase"
-                          style={{ fontSize: "15px", letterSpacing: "0.5px" }}
+                          className="text-center font-bold text-base uppercase"
+                          style={{
+                            fontSize: "15px",
+                            letterSpacing: "0.5px",
+                            marginTop: "16px",
+                            marginBottom: "16px",
+                          }}
                         >
                           GRAND TOTAL &#x20B9;{grandSum}
                         </div>
@@ -710,7 +738,7 @@ ${wDates
                 </table>
               </div>
               <div
-                className="text-center font-bold uppercase mt-4 mb-3"
+                className="text-center font-bold uppercase mt-6 mb-4"
                 style={{ fontSize: "15px", letterSpacing: "0.5px" }}
               >
                 GRAND TOTAL &#x20B9;{Math.round(overallTotal)}
