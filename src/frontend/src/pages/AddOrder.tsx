@@ -191,17 +191,19 @@ export default function AddOrder({ onSubmit, onBack }: Props) {
               </button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={orderDate}
-                onSelect={(d) => {
-                  if (d) {
-                    setOrderDate(d);
-                    setOrderDateOpen(false);
-                  }
-                }}
-                initialFocus
-              />
+              <div className="p-2 [--cell-size:44px] text-base">
+                <Calendar
+                  mode="single"
+                  selected={orderDate}
+                  onSelect={(d) => {
+                    if (d) {
+                      setOrderDate(d);
+                      setOrderDateOpen(false);
+                    }
+                  }}
+                  initialFocus
+                />
+              </div>
             </PopoverContent>
           </Popover>
         </div>
@@ -277,15 +279,17 @@ export default function AddOrder({ onSubmit, onBack }: Props) {
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={approxDate}
-                  onSelect={(d) => {
-                    setApproxDate(d);
-                    setApproxDateOpen(false);
-                  }}
-                  initialFocus
-                />
+                <div className="p-2 [--cell-size:44px] text-base">
+                  <Calendar
+                    mode="single"
+                    selected={approxDate}
+                    onSelect={(d) => {
+                      setApproxDate(d);
+                      setApproxDateOpen(false);
+                    }}
+                    initialFocus
+                  />
+                </div>
               </PopoverContent>
             </Popover>
           </div>
