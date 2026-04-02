@@ -10,19 +10,8 @@ import { useState } from "react";
 import { toast } from "sonner";
 import type { CompleteDelivery } from "../App";
 
-declare const window: Window & {
-  jspdf: {
-    jsPDF: new (opts: {
-      unit: string;
-      format: string;
-      orientation?: string;
-    }) => any;
-  };
-  html2canvas: (
-    element: HTMLElement,
-    options?: any,
-  ) => Promise<HTMLCanvasElement>;
-};
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 
 type Props = {
   deliveries: CompleteDelivery[];
@@ -115,10 +104,6 @@ export default function CompleteDeliveryListPage({
   }
 
   async function handleDownloadPdf() {
-    if (!window.jspdf || !window.html2canvas) {
-      alert("PDF library not loaded. Please check your internet connection.");
-      return;
-    }
     const container = document.createElement("div");
     container.style.cssText =
       "position:fixed;left:-9999px;top:0;width:900px;background:white;padding:20px;font-family:Arial,sans-serif;font-size:12px;";
@@ -162,14 +147,13 @@ export default function CompleteDeliveryListPage({
         <tbody>${rows}</tbody>
       </table>`;
     document.body.appendChild(container);
-    const canvas = await window.html2canvas(container, {
+    const canvas = await html2canvas(container, {
       scale: 2,
       useCORS: true,
       backgroundColor: "#ffffff",
     });
     document.body.removeChild(container);
     const imgData = canvas.toDataURL("image/png");
-    const { jsPDF } = window.jspdf;
     const doc = new jsPDF({
       unit: "mm",
       format: "a4",

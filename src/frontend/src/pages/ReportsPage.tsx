@@ -2,20 +2,8 @@ import { ArrowLeft, Download, Printer } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { CompleteDelivery } from "../App";
 
-// jsPDF, jspdf-autotable, and html2canvas are loaded via CDN in index.html
-declare const window: Window & {
-  jspdf: {
-    jsPDF: new (opts: {
-      unit: string;
-      format: string;
-      orientation?: string;
-    }) => any;
-  };
-  html2canvas: (
-    element: HTMLElement,
-    options?: any,
-  ) => Promise<HTMLCanvasElement>;
-};
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 
 type Props = { completeDeliveries: CompleteDelivery[]; onBack: () => void };
 
@@ -201,17 +189,6 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
 
   // ── PDF ──────────────────────────────────────────────────────────────────
   async function handleDownloadPdf() {
-    if (!window.jspdf) {
-      alert("PDF library not loaded. Please check your internet connection.");
-      return;
-    }
-    if (!window.html2canvas) {
-      alert(
-        "html2canvas library not loaded. Please check your internet connection.",
-      );
-      return;
-    }
-
     const el = document.getElementById("report-print-area");
     if (!el) return;
 
@@ -224,7 +201,7 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
     const prevOverflow = el.style.overflow;
     el.style.overflow = "visible";
 
-    const canvas = await window.html2canvas(el, {
+    const canvas = await html2canvas(el, {
       scale: 2,
       useCORS: true,
       backgroundColor: "#ffffff",
@@ -237,7 +214,6 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
     el.style.overflow = prevOverflow;
 
     const imgData = canvas.toDataURL("image/png");
-    const { jsPDF } = window.jspdf;
 
     const pageWidth = 210; // A4 mm
     const pageHeight = 297;
