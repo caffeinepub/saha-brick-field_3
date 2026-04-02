@@ -2,9 +2,19 @@ import { ArrowLeft, Download, Printer } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { CompleteDelivery } from "../App";
 
-// jsPDF and jspdf-autotable are loaded via CDN in index.html
+// jsPDF, jspdf-autotable, and html2canvas are loaded via CDN in index.html
 declare const window: Window & {
-  jspdf: { jsPDF: new (opts: { unit: string; format: string }) => any };
+  jspdf: {
+    jsPDF: new (opts: {
+      unit: string;
+      format: string;
+      orientation?: string;
+    }) => any;
+  };
+  html2canvas: (
+    element: HTMLElement,
+    options?: any,
+  ) => Promise<HTMLCanvasElement>;
 };
 
 type Props = { completeDeliveries: CompleteDelivery[]; onBack: () => void };
@@ -167,14 +177,15 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
     const win = window.open("", "", "width=900,height=700");
     if (!win) return;
     win.document.write(`<html><head><title>${reportTitle}</title><style>
-      body{font-family:Arial,sans-serif;margin:20px;font-size:13px;}
+      @import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&display=swap');
+      body{font-family:'Noto Sans',Arial,sans-serif;margin:20px;font-size:13px;}
       h1{text-align:center;font-size:18px;font-weight:bold;margin:0;text-transform:uppercase;}
       h2{text-align:center;font-size:14px;font-weight:bold;margin:4px 0;text-transform:uppercase;}
       p.date-line{text-align:center;font-size:11px;color:#555;margin-bottom:12px;}
       table{width:100%;border-collapse:collapse;margin-bottom:6px;}
       th{background:#1b5e20;color:white;font-weight:bold;padding:8px;text-align:center;border:1px solid #999;text-transform:uppercase;}
       th.left{text-align:left;}
-      td{border:1px solid #bbb;padding:7px 8px;font-size:12px;}
+      td{border:1px solid #bbb;padding:7px 8px;font-size:12px;font-family:'Noto Sans',Arial,sans-serif;}
       tr:nth-child(even) td{background:#f5f5f5;}
       .vehicle-box{background:#fffde7;border:1px solid #ccc000;font-weight:bold;padding:7px 10px;margin:14px 0 4px 0;font-size:13px;text-transform:uppercase;}
       .grand-total{text-align:center;font-weight:bold;font-size:15px;margin:10px 0 6px 0;text-transform:uppercase;}
@@ -188,185 +199,66 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
   }
 
   // ── PDF ──────────────────────────────────────────────────────────────────
-  function handleDownloadPdf() {
+  async function handleDownloadPdf() {
     if (!window.jspdf) {
       alert("PDF library not loaded. Please check your internet connection.");
       return;
     }
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ unit: "mm", format: "a4" });
-    let y = 15;
+    if (!window.html2canvas) {
+      alert(
+        "html2canvas library not loaded. Please check your internet connection.",
+      );
+      return;
+    }
+
+    const el = document.getElementById("report-print-area");
+    if (!el) return;
+
     const fileName =
       activeTab === "daily"
         ? `daily-report-${fromDate || new Date().toISOString().slice(0, 10)}.pdf`
         : `weekly-report-${toDate || new Date().toISOString().slice(0, 10)}.pdf`;
 
-    doc.setFontSize(16);
-    doc.setFont("helvetica", "bold");
-    doc.text("S B C O BRICK FIELD", 105, y, { align: "center" });
-    y += 8;
-    doc.setFontSize(13);
-    doc.text(reportTitle, 105, y, { align: "center" });
-    y += 7;
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    if (dateLabel) {
-      doc.text(dateLabel, 105, y, { align: "center" });
-      y += 10;
-    } else y += 4;
+    const canvas = await window.html2canvas(el, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: "#ffffff",
+    });
 
-    if (activeTab === "daily") {
-      if (dailyGrouped.size === 0) {
-        doc.text("No data found", 105, y, { align: "center" });
-        doc.save(fileName);
-        return;
-      }
-      const globalLabourTotals = new Map<string, number>();
+    const imgData = canvas.toDataURL("image/png");
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({
+      unit: "mm",
+      format: "a4",
+      orientation: "portrait",
+    });
 
-      for (const [vehicleNumber, rows] of dailyGrouped) {
-        doc.setFillColor(255, 253, 231);
-        doc.rect(10, y, 190, 9, "F");
-        doc.setDrawColor(200, 192, 0);
-        doc.rect(10, y, 190, 9);
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(12);
-        doc.setTextColor(0, 0, 0);
-        doc.text(`VEHICLE: ${vehicleNumber}`, 14, y + 6.5);
-        y += 13;
+    const margin = 10;
+    const pageWidth = 210;
+    const pageHeight = 297;
+    const contentWidth = pageWidth - margin * 2;
+    const imgAspect = canvas.height / canvas.width;
+    const totalImgHeight = contentWidth * imgAspect;
+    const contentHeight = pageHeight - margin * 2;
 
-        const vLabours = new Set<string>();
-        for (const r of rows) {
-          for (const name of r.loadingLabours || []) vLabours.add(name);
-          for (const name of r.unloadingLabours || []) vLabours.add(name);
-        }
-        const lCols = Array.from(vLabours);
-        const colTotals = new Map<string, number>();
+    let renderedHeight = 0;
+    let pageNum = 0;
 
-        const head = [
-          ["ADDRESS", "QTY", "RATE", ...lCols.map((n) => n.toUpperCase())],
-        ];
-        const body = rows.map((r) => {
-          const qty = (r.deliverItems || []).reduce(
-            (s, b) => s + (b.deliverQty || 0),
-            0,
-          );
-          const rate = r.ratePerThousand ?? 0;
-          const breakdown = r.labourBreakdown || {};
-          return [
-            (r.address || r.customerName || "-").toUpperCase(),
-            String(qty),
-            String(rate),
-            ...lCols.map((name) => {
-              const inRow = [
-                ...(r.loadingLabours || []),
-                ...(r.unloadingLabours || []),
-              ].includes(name);
-              const amt = inRow ? breakdown[name] || 0 : 0;
-              if (inRow) {
-                colTotals.set(name, (colTotals.get(name) || 0) + amt);
-                globalLabourTotals.set(
-                  name,
-                  (globalLabourTotals.get(name) || 0) + amt,
-                );
-              }
-              return inRow ? `${Math.round(amt)}` : "-";
-            }),
-          ];
-        });
-        const grandSum = rows.reduce((s, r) => s + (r.totalAmount || 0), 0);
-
-        doc.autoTable({
-          startY: y,
-          head,
-          body,
-          theme: "grid",
-          styles: { fontSize: 10, cellPadding: 3, textColor: [0, 0, 0] },
-          headStyles: {
-            fillColor: [27, 94, 32],
-            textColor: [255, 255, 255],
-            fontStyle: "bold",
-            halign: "center",
-          },
-          columnStyles: { 0: { halign: "left" } },
-          alternateRowStyles: { fillColor: [245, 245, 245] },
-          margin: { left: 10, right: 10 },
-          tableWidth: 190,
-          didParseCell: (data: any) => {
-            if (data.section === "body" && data.column.index > 0)
-              data.cell.styles.halign = "center";
-          },
-        });
-        y = doc.lastAutoTable.finalY + 6;
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(13);
-        doc.text(`GRAND TOTAL  \u20B9${grandSum}`, 105, y, { align: "center" });
-        y += 12;
-        if (y > 265) {
-          doc.addPage();
-          y = 15;
-        }
-      }
-      const summaryParts = Array.from(globalLabourTotals.entries()).map(
-        ([n, a]) => `${n.toUpperCase()}  \u20B9${Math.round(a)}`,
+    while (renderedHeight < totalImgHeight) {
+      if (pageNum > 0) doc.addPage();
+      doc.addImage(
+        imgData,
+        "PNG",
+        margin,
+        margin - renderedHeight,
+        contentWidth,
+        totalImgHeight,
       );
-      if (summaryParts.length > 0) {
-        doc.setDrawColor(180, 180, 180);
-        doc.line(10, y, 200, y);
-        y += 6;
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(11);
-        doc.text(summaryParts.join("      "), 105, y, {
-          align: "center",
-          maxWidth: 185,
-        });
-      }
-    } else {
-      // WEEKLY
-      const { activeDates, allLabours, matrix, labourTotals, overallTotal } =
-        weeklyData;
-      if (activeDates.length === 0) {
-        doc.text("No data found", 105, y, { align: "center" });
-        doc.save(fileName);
-        return;
-      }
-      const head = [["NAME", ...activeDates.map(fmtDateShort), "TOTAL"]];
-      const body = allLabours.map((name) => [
-        name.toUpperCase(),
-        ...activeDates.map((date) => {
-          const v = matrix.get(name)?.get(date);
-          return v ? String(Math.round(v)) : "-";
-        }),
-        String(Math.round(labourTotals.get(name) || 0)),
-      ]);
-
-      doc.autoTable({
-        startY: y,
-        head,
-        body,
-        theme: "grid",
-        styles: { fontSize: 10, cellPadding: 3, textColor: [0, 0, 0] },
-        headStyles: {
-          fillColor: [27, 94, 32],
-          textColor: [255, 255, 255],
-          fontStyle: "bold",
-          halign: "center",
-        },
-        columnStyles: { 0: { halign: "left" } },
-        alternateRowStyles: { fillColor: [245, 245, 245] },
-        margin: { left: 10, right: 10 },
-        tableWidth: 190,
-        didParseCell: (data: any) => {
-          if (data.section === "body" && data.column.index > 0)
-            data.cell.styles.halign = "center";
-        },
-      });
-      y = doc.lastAutoTable.finalY + 6;
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(13);
-      doc.text(`GRAND TOTAL  \u20B9${Math.round(overallTotal)}`, 105, y, {
-        align: "center",
-      });
+      renderedHeight += contentHeight;
+      pageNum++;
+      if (pageNum > 20) break;
     }
+
     doc.save(fileName);
   }
 
@@ -459,7 +351,11 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
         </div>
 
         {/* Print area */}
-        <div id="report-print-area" className="bg-white rounded shadow p-4">
+        <div
+          id="report-print-area"
+          className="bg-white rounded shadow p-4"
+          style={{ fontFamily: "'Noto Sans', Arial, sans-serif" }}
+        >
           <h1 className="text-center font-bold text-xl mb-1 uppercase">
             S B C O BRICK FIELD
           </h1>
@@ -640,7 +536,7 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
                                           }}
                                         >
                                           {inRow
-                                            ? `₹${Math.round(rowBreakdown[name] || 0)}`
+                                            ? `\u20B9${Math.round(rowBreakdown[name] || 0)}`
                                             : "-"}
                                         </td>
                                       );
@@ -655,7 +551,7 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
                           className="text-center font-bold text-base mt-3 mb-1 uppercase"
                           style={{ fontSize: "15px", letterSpacing: "0.5px" }}
                         >
-                          GRAND TOTAL ₹{grandSum}
+                          GRAND TOTAL &#x20B9;{grandSum}
                         </div>
                       </div>
                     );
@@ -685,7 +581,7 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
                       >
                         {summaryEntries.map(([n, a]) => (
                           <span key={n}>
-                            {n.toUpperCase()} ₹{Math.round(a)}
+                            {n.toUpperCase()} &#x20B9;{Math.round(a)}
                           </span>
                         ))}
                       </div>
@@ -775,7 +671,7 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
                                 textAlign: "center",
                               }}
                             >
-                              {v ? `₹${Math.round(v)}` : "-"}
+                              {v ? `\u20B9${Math.round(v)}` : "-"}
                             </td>
                           );
                         })}
@@ -787,7 +683,7 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
                             fontWeight: 600,
                           }}
                         >
-                          ₹{Math.round(labourTotals.get(name) || 0)}
+                          &#x20B9;{Math.round(labourTotals.get(name) || 0)}
                         </td>
                       </tr>
                     ))}
@@ -798,7 +694,7 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
                 className="text-center font-bold uppercase mt-4 mb-3"
                 style={{ fontSize: "15px", letterSpacing: "0.5px" }}
               >
-                GRAND TOTAL ₹{Math.round(overallTotal)}
+                GRAND TOTAL &#x20B9;{Math.round(overallTotal)}
               </div>
             </>
           )}
