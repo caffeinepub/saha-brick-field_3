@@ -6,7 +6,7 @@ import {
 } from "@/components/ui/popover";
 import { format } from "date-fns";
 import { ArrowLeft, CalendarIcon, Check } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { CompleteDelivery, PendingDelivery, Vehicle } from "../App";
 
@@ -16,6 +16,14 @@ type Props = {
   onBack: () => void;
   onSave: (cd: Omit<CompleteDelivery, "id" | "createdAt">) => void;
 };
+
+function loadSbfRate() {
+  try {
+    const saved = localStorage.getItem("sbf_rate");
+    if (saved) return JSON.parse(saved);
+  } catch {}
+  return null;
+}
 
 export default function CompleteDeliveryFormPage({
   delivery,
@@ -39,6 +47,28 @@ export default function CompleteDeliveryFormPage({
   const [paymentStatus, setPaymentStatus] = useState<"not-paid" | "paid">(
     "not-paid",
   );
+
+  // Auto-populate ratePerThousand from sbf_rate when vehicleType changes
+  useEffect(() => {
+    const rates = loadSbfRate();
+    if (!rates) return;
+    const locType = delivery.locationType || "Local";
+    let resolved = "";
+    if (vehicleType === "Tractor") {
+      const tr = rates.tractorRate || {};
+      if (locType === "Outside") {
+        resolved = String(tr.outsidePerThousand || "");
+      } else {
+        resolved = String(tr.localPerThousand || "");
+      }
+    } else {
+      const wr = rates.wheelRate || {};
+      resolved = String(wr.perThousand || "");
+    }
+    if (resolved && resolved !== "0") {
+      setRatePerThousand(resolved);
+    }
+  }, [vehicleType, delivery.locationType]);
 
   const filteredVehicles = vehicles.filter((v) => v.type === vehicleType);
   const selectedVehicle = vehicles.find((v) => v.id === selectedVehicleId);
@@ -70,16 +100,18 @@ export default function CompleteDeliveryFormPage({
     setCustomUnloadingInput("");
   };
 
-  // Load batsRate from settings (bats100), fall back to delivery.rate
+  // Load batsRate from sbf_rate (safety100) based on vehicleType, fallback to delivery.rate
   const batsRate = (() => {
-    try {
-      const saved = localStorage.getItem("sbf_bricks_rate");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        const fromSettings = Number(parsed.bats100) || 0;
-        if (fromSettings > 0) return fromSettings;
+    const rates = loadSbfRate();
+    if (rates) {
+      let safety = 0;
+      if (vehicleType === "Tractor") {
+        safety = Number(rates.tractorRate?.safety100) || 0;
+      } else {
+        safety = Number(rates.wheelRate?.safety100) || 0;
       }
-    } catch {}
+      if (safety > 0) return safety;
+    }
     return delivery.rate || 0;
   })();
 

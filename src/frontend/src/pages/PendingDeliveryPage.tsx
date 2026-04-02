@@ -146,8 +146,13 @@ export default function PendingDeliveryPage({
               {/* Top row */}
               <div className="flex items-start justify-between mb-1">
                 <div>
-                  <div className="font-extrabold text-lg text-gray-900 leading-tight">
-                    {d.customerName}
+                  <div className="flex items-center gap-2">
+                    <div className="font-extrabold text-lg text-gray-900 leading-tight">
+                      {d.customerName}
+                    </div>
+                    {d.approxDeliveryDate && d.approxDeliveryDate !== "" && (
+                      <span className="inline-block w-4 h-4 rounded-full bg-purple-500 shadow-md flex-shrink-0" />
+                    )}
                   </div>
                   <div className="text-xs text-gray-500 mt-0.5">
                     {d.address && d.address}
@@ -218,9 +223,11 @@ export default function PendingDeliveryPage({
                       </span>
                     ))}
                   </div>
-                  <span className="bg-red-500 text-white font-bold text-sm px-4 py-1.5 rounded-full whitespace-nowrap">
-                    Due: {d.dueAmount.toLocaleString()}
-                  </span>
+                  {d.approxDeliveryDate && d.approxDeliveryDate !== "" && (
+                    <span className="bg-red-500 text-white font-bold text-sm px-4 py-1.5 rounded-full whitespace-nowrap">
+                      Due: {d.dueAmount.toLocaleString()}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

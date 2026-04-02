@@ -68,6 +68,7 @@ export type PendingDelivery = {
   deliverItems: { type: string; deliverQty: number }[];
   dueAmount: number;
   rate?: number;
+  approxDeliveryDate?: string;
   status: "pending" | "delivered";
   createdAt: string;
 };
@@ -413,6 +414,7 @@ export default function App() {
         {page === "pending-order" && pendingOrderId && (
           <PendingOrderPage
             order={orders.find((o) => o.id === pendingOrderId)!}
+            existingPendingDeliveries={pendingDeliveries}
             onBack={() => setPage("total-orders")}
             onSave={(delivery) => {
               addPendingDelivery(delivery);

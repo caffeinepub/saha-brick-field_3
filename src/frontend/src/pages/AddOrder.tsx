@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/popover";
 import { format } from "date-fns";
 import { ArrowLeft, CalendarIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { BrickItem, Order } from "../App";
 
@@ -40,6 +40,17 @@ const BRICK_TYPES = [
   "Bats",
 ];
 
+const BRICK_RATE_MAP: Record<string, string> = {
+  "1 No Bricks": "oneNo",
+  "2 No Bricks": "twoNo",
+  "3 No Bricks": "threeNo",
+  "1 No Picket": "onePichet",
+  "2 No Picket": "twoPichet",
+  Crack: "crack",
+  Goria: "goria",
+  Bats: "bats100",
+};
+
 const today = new Date();
 
 export default function AddOrder({ onSubmit, onBack }: Props) {
@@ -63,6 +74,30 @@ export default function AddOrder({ onSubmit, onBack }: Props) {
   const [locationType, setLocationType] = useState<"Local" | "Outside">(
     "Local",
   );
+
+  // Auto-calculate totalAmount from bricks rate settings whenever selectedBricks changes
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("sbf_bricks_rate");
+      if (!saved) return;
+      const rates = JSON.parse(saved);
+      let calc = 0;
+      for (const [type, qty] of Object.entries(selectedBricks)) {
+        const rateKey = BRICK_RATE_MAP[type];
+        if (!rateKey) continue;
+        const rateVal = Number(rates[rateKey]) || 0;
+        if (rateVal === 0) continue;
+        if (type === "Bats") {
+          calc += ((qty as number) / 100) * rateVal;
+        } else {
+          calc += ((qty as number) / 1000) * rateVal;
+        }
+      }
+      setTotalAmount(calc > 0 ? String(Math.round(calc)) : "");
+    } catch {
+      // ignore
+    }
+  }, [selectedBricks]);
 
   const toggleBrick = (type: string) => {
     setSelectedBricks((prev) => {

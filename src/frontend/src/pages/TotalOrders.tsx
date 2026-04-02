@@ -196,10 +196,13 @@ function OrderCard({
   const batsDue =
     order.batsDue !== undefined ? order.batsDue : order.batsSafety;
 
-  // Show purple dot only if approxDeliveryDate is set
-  const showPurpleDot = !!(
+  // Billing is active only when Approx Date is set
+  const billingActive = !!(
     order.approxDeliveryDate && order.approxDeliveryDate.trim() !== ""
   );
+
+  // Show purple dot only if approxDeliveryDate is set
+  const showPurpleDot = billingActive;
 
   return (
     <div className="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -293,67 +296,71 @@ function OrderCard({
         )}
       </div>
 
-      <div className="border-t border-gray-100 grid grid-cols-4 divide-x divide-gray-100">
-        {[
-          {
-            label: "BRICKS",
-            value: order.totalBricks.toLocaleString(),
-            color: "text-gray-900",
-          },
-          {
-            label: "TOTAL",
-            value: order.totalAmount.toLocaleString(),
-            color: "text-gray-900",
-          },
-          {
-            label: "PAID",
-            value: order.paidAmount.toLocaleString(),
-            color: "text-gray-900",
-          },
-          {
-            label: "DUE",
-            value: order.dueAmount.toLocaleString(),
-            color: "text-red-500",
-          },
-        ].map(({ label, value, color }) => (
-          <div key={label} className="flex flex-col items-center py-2">
-            <span className="text-[9px] font-bold tracking-wider text-gray-400 uppercase">
-              {label}
-            </span>
-            <span className={`text-sm font-extrabold ${color}`}>{value}</span>
-          </div>
-        ))}
-      </div>
+      {billingActive && (
+        <div className="border-t border-gray-100 grid grid-cols-4 divide-x divide-gray-100">
+          {[
+            {
+              label: "BRICKS",
+              value: order.totalBricks.toLocaleString(),
+              color: "text-gray-900",
+            },
+            {
+              label: "TOTAL",
+              value: order.totalAmount.toLocaleString(),
+              color: "text-gray-900",
+            },
+            {
+              label: "PAID",
+              value: order.paidAmount.toLocaleString(),
+              color: "text-gray-900",
+            },
+            {
+              label: "DUE",
+              value: order.dueAmount.toLocaleString(),
+              color: "text-red-500",
+            },
+          ].map(({ label, value, color }) => (
+            <div key={label} className="flex flex-col items-center py-2">
+              <span className="text-[9px] font-bold tracking-wider text-gray-400 uppercase">
+                {label}
+              </span>
+              <span className={`text-sm font-extrabold ${color}`}>{value}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
-      <div className="border-t border-gray-100 flex items-center justify-between px-3 py-2">
-        <div className="flex items-center gap-4">
-          <div>
-            <span className="text-[9px] font-bold tracking-wider text-gray-400 uppercase block">
-              BRICKS DUE
-            </span>
-            <span className="text-base font-extrabold text-orange-500">
-              {bricksDue.toLocaleString()}
-            </span>
-          </div>
-          {batsDue > 0 && (
+      {billingActive && (
+        <div className="border-t border-gray-100 flex items-center justify-between px-3 py-2">
+          <div className="flex items-center gap-4">
             <div>
               <span className="text-[9px] font-bold tracking-wider text-gray-400 uppercase block">
-                BATS DUE
+                BRICKS DUE
               </span>
               <span className="text-base font-extrabold text-orange-500">
-                {batsDue}
+                {bricksDue.toLocaleString()}
               </span>
             </div>
-          )}
+            {batsDue > 0 && (
+              <div>
+                <span className="text-[9px] font-bold tracking-wider text-gray-400 uppercase block">
+                  BATS DUE
+                </span>
+                <span className="text-base font-extrabold text-orange-500">
+                  {batsDue}
+                </span>
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={onAddPayment}
+            className="bg-[#1a3c2a] text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center gap-1.5 hover:bg-[#2a5c3a] transition-colors"
+          >
+            <span>💳</span> Add Payment
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={onAddPayment}
-          className="bg-[#1a3c2a] text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center gap-1.5 hover:bg-[#2a5c3a] transition-colors"
-        >
-          <span>💳</span> Add Payment
-        </button>
-      </div>
+      )}
     </div>
   );
 }

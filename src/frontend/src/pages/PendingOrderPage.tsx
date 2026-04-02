@@ -14,9 +14,15 @@ type Props = {
   order: Order;
   onBack: () => void;
   onSave: (delivery: Omit<PendingDelivery, "id" | "createdAt">) => void;
+  existingPendingDeliveries?: PendingDelivery[];
 };
 
-export default function PendingOrderPage({ order, onBack, onSave }: Props) {
+export default function PendingOrderPage({
+  order,
+  onBack,
+  onSave,
+  existingPendingDeliveries = [],
+}: Props) {
   const [pendingDate, setPendingDate] = useState<Date>(new Date());
   const [dateOpen, setDateOpen] = useState(false);
 
@@ -26,13 +32,21 @@ export default function PendingOrderPage({ order, onBack, onSave }: Props) {
     deliveredQty[rec.brickType] = (deliveredQty[rec.brickType] || 0) + rec.qty;
   }
 
-  // Compute remaining brick items (exclude fully delivered)
+  // Compute already-pending brick types for this order (status === "pending")
+  const alreadyPendingTypes = new Set(
+    existingPendingDeliveries
+      .filter((d) => d.orderId === order.id && d.status === "pending")
+      .flatMap((d) => d.deliverItems.map((i) => i.type)),
+  );
+
+  // Compute remaining brick items (exclude fully delivered AND already pending)
   const remainingItems = order.brickItems
     .map((b) => ({
       ...b,
       remaining: b.quantity - (deliveredQty[b.type] || 0),
     }))
-    .filter((b) => b.remaining > 0);
+    .filter((b) => b.remaining > 0)
+    .filter((b) => !alreadyPendingTypes.has(b.type));
 
   const [deliverQtys, setDeliverQtys] = useState<Record<string, string>>(
     Object.fromEntries(remainingItems.map((b) => [b.type, ""])),
@@ -98,11 +112,21 @@ export default function PendingOrderPage({ order, onBack, onSave }: Props) {
       })),
       dueAmount: order.dueAmount,
       rate: savedRate,
+      approxDeliveryDate: order.approxDeliveryDate,
       status: "pending",
     });
     toast.success("Pending delivery যোগ হয়েছে!");
-    // Navigation is handled by onSave in App.tsx (goes to pending-delivery page)
   };
+
+  // All remaining brick types (after delivery deduction) are already pending
+  const allOriginalRemaining = order.brickItems
+    .map((b) => ({
+      ...b,
+      remaining: b.quantity - (deliveredQty[b.type] || 0),
+    }))
+    .filter((b) => b.remaining > 0);
+  const allTypesPending =
+    allOriginalRemaining.length > 0 && remainingItems.length === 0;
 
   return (
     <div className="flex flex-col flex-1 pb-20 bg-[#edf5ed] min-h-screen">
@@ -318,21 +342,34 @@ export default function PendingOrderPage({ order, onBack, onSave }: Props) {
           </div>
         )}
 
-        {remainingItems.length === 0 && (
+        {allTypesPending && (
+          <div className="bg-white rounded-xl p-8 text-center shadow-sm">
+            <div className="text-amber-600 font-bold text-sm uppercase tracking-widest mb-1">
+              All brick types already pending
+            </div>
+            <div className="text-gray-400 text-xs">
+              সব brick type-এর জন্য ইতোমধ্যে pending delivery আছে
+            </div>
+          </div>
+        )}
+
+        {!allTypesPending && remainingItems.length === 0 && (
           <div className="bg-white rounded-xl p-8 text-center text-gray-400 shadow-sm">
             সব brick delivery সম্পন্ন হয়েছে
           </div>
         )}
 
         {/* Save Button */}
-        <button
-          type="button"
-          onClick={handleSave}
-          className="bg-[#1a3c2a] text-white font-bold uppercase tracking-widest py-4 rounded-xl text-sm hover:bg-[#2a5c3a] transition-colors shadow-md flex items-center justify-center gap-3"
-        >
-          <Truck size={18} />
-          PENDING ডেলিভারি যোগ করন
-        </button>
+        {remainingItems.length > 0 && (
+          <button
+            type="button"
+            onClick={handleSave}
+            className="bg-[#1a3c2a] text-white font-bold uppercase tracking-widest py-4 rounded-xl text-sm hover:bg-[#2a5c3a] transition-colors shadow-md flex items-center justify-center gap-3"
+          >
+            <Truck size={18} />
+            PENDING ডেলিভারি যোগ করন
+          </button>
+        )}
       </div>
     </div>
   );
