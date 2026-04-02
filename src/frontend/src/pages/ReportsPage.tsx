@@ -167,7 +167,7 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
     fromDate && toDate
       ? fromDate === toDate
         ? fmtDate(fromDate)
-        : `${fmtDate(fromDate)} → ${fmtDate(toDate)}`
+        : `${fmtDate(fromDate)} \u2192 ${fmtDate(toDate)}`
       : "";
 
   // ── PRINT ────────────────────────────────────────────────────────────────
@@ -176,18 +176,19 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
     if (!el) return;
     const win = window.open("", "", "width=900,height=700");
     if (!win) return;
-    win.document.write(`<html><head><title>${reportTitle}</title><style>
+    win.document.write(`<html><head><meta charset="UTF-8"><title>${reportTitle}</title><style>
       @import url('https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600;700&display=swap');
       body{font-family:'Noto Sans',Arial,sans-serif;margin:20px;font-size:13px;}
       h1{text-align:center;font-size:18px;font-weight:bold;margin:0;text-transform:uppercase;}
       h2{text-align:center;font-size:14px;font-weight:bold;margin:4px 0;text-transform:uppercase;}
       p.date-line{text-align:center;font-size:11px;color:#555;margin-bottom:12px;}
+      .vehicle-section{margin-bottom:25px;padding:10px;border:1px solid #ccc;border-radius:4px;}
       table{width:100%;border-collapse:collapse;margin-bottom:6px;}
-      th{background:#1b5e20;color:white;font-weight:bold;padding:8px;text-align:center;border:1px solid #999;text-transform:uppercase;}
+      th{background:#1b5e20;color:white;font-weight:bold;padding:9px 10px;font-size:14px;text-align:center;border:1px solid #999;text-transform:uppercase;}
       th.left{text-align:left;}
-      td{border:1px solid #bbb;padding:7px 8px;font-size:12px;font-family:'Noto Sans',Arial,sans-serif;}
+      td{border:1px solid #ccc;padding:6px 8px;font-size:13px;font-family:'Noto Sans',Arial,sans-serif;}
       tr:nth-child(even) td{background:#f5f5f5;}
-      .vehicle-box{background:#fffde7;border:1px solid #ccc000;font-weight:bold;padding:7px 10px;margin:14px 0 4px 0;font-size:13px;text-transform:uppercase;}
+      .vehicle-box{background:#fffde7;border:1px solid #ccc000;font-weight:bold;padding:7px 10px;margin:0 0 4px 0;font-size:13px;text-transform:uppercase;}
       .grand-total{text-align:center;font-weight:bold;font-size:15px;margin:10px 0 6px 0;text-transform:uppercase;}
       .labour-summary{display:flex;flex-wrap:wrap;justify-content:center;gap:24px;font-size:13px;font-weight:700;margin:10px 0 16px 0;color:#1b5e20;text-transform:uppercase;padding:8px 0;border-top:2px solid #ccc;letter-spacing:0.5px;}
       @media print{@page{size:A4;margin:15mm;}}
@@ -219,44 +220,51 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
         ? `daily-report-${fromDate || new Date().toISOString().slice(0, 10)}.pdf`
         : `weekly-report-${toDate || new Date().toISOString().slice(0, 10)}.pdf`;
 
+    // Temporarily expand for full render
+    const prevOverflow = el.style.overflow;
+    el.style.overflow = "visible";
+
     const canvas = await window.html2canvas(el, {
       scale: 2,
       useCORS: true,
       backgroundColor: "#ffffff",
+      scrollX: 0,
+      scrollY: 0,
+      windowWidth: el.scrollWidth,
+      windowHeight: el.scrollHeight,
     });
+
+    el.style.overflow = prevOverflow;
 
     const imgData = canvas.toDataURL("image/png");
     const { jsPDF } = window.jspdf;
+
+    const pageWidth = 210; // A4 mm
+    const pageHeight = 297;
+    const margin = 10;
+    const contentWidth = pageWidth - margin * 2;
+    const imgHeightMm = (canvas.height / canvas.width) * contentWidth;
+
     const doc = new jsPDF({
       unit: "mm",
       format: "a4",
       orientation: "portrait",
     });
 
-    const margin = 10;
-    const pageWidth = 210;
-    const pageHeight = 297;
-    const contentWidth = pageWidth - margin * 2;
-    const imgAspect = canvas.height / canvas.width;
-    const totalImgHeight = contentWidth * imgAspect;
-    const contentHeight = pageHeight - margin * 2;
+    let yOffset = 0;
+    const pageContentHeight = pageHeight - margin * 2;
 
-    let renderedHeight = 0;
-    let pageNum = 0;
-
-    while (renderedHeight < totalImgHeight) {
-      if (pageNum > 0) doc.addPage();
+    while (yOffset < imgHeightMm) {
+      if (yOffset > 0) doc.addPage();
       doc.addImage(
         imgData,
         "PNG",
         margin,
-        margin - renderedHeight,
+        margin - yOffset,
         contentWidth,
-        totalImgHeight,
+        imgHeightMm,
       );
-      renderedHeight += contentHeight;
-      pageNum++;
-      if (pageNum > 20) break;
+      yOffset += pageContentHeight;
     }
 
     doc.save(fileName);
@@ -264,6 +272,29 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
 
   const { activeDates, allLabours, matrix, labourTotals, overallTotal } =
     weeklyData;
+
+  // Common th styles
+  const thStyle: React.CSSProperties = {
+    padding: "9px 10px",
+    border: "1px solid #999",
+    textAlign: "center",
+    fontWeight: "bold",
+    fontSize: "14px",
+    textTransform: "uppercase",
+  };
+  const thLeftStyle: React.CSSProperties = { ...thStyle, textAlign: "left" };
+  const tdStyle: React.CSSProperties = {
+    padding: "6px 8px",
+    border: "1px solid #ccc",
+    fontSize: "13px",
+    textAlign: "center",
+    fontFamily: "'Noto Sans', Arial, sans-serif",
+  };
+  const tdLeftStyle: React.CSSProperties = {
+    ...tdStyle,
+    textAlign: "left",
+    textTransform: "uppercase",
+  };
 
   return (
     <div className="flex flex-col flex-1 pb-16">
@@ -315,7 +346,7 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
               className="border border-gray-300 rounded px-2 py-1 text-sm"
             />
           </div>
-          <span className="text-gray-500 font-bold">→</span>
+          <span className="text-gray-500 font-bold">&rarr;</span>
           <div className="flex items-center gap-1">
             <span className="text-sm font-semibold text-gray-700">TO:</span>
             <input
@@ -367,7 +398,9 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
           {activeTab === "daily" ? (
             dailyGrouped.size === 0 ? (
               <div className="text-center text-gray-400 py-10 text-sm">
-                {fromDate && toDate ? "কোনো ডেটা পাওয়া যায়নি" : "তারিখ সিলেক্ট করুন"}
+                {fromDate && toDate
+                  ? "\u0995\u09CB\u09A8\u09CB \u09A1\u09C7\u099F\u09BE \u09AA\u09BE\u0993\u09AF\u09BC\u09BE \u09AF\u09BE\u09AF\u09BC\u09A8\u09BF"
+                  : "\u09A4\u09BE\u09B0\u09BF\u0996 \u09B8\u09BF\u09B2\u09C7\u0995\u09CD\u099F \u0995\u09B0\u09C1\u09A8"}
               </div>
             ) : (
               (() => {
@@ -403,9 +436,18 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
                       }
                     }
                     return (
-                      <div key={vehicleNumber} className="mb-6">
+                      <div
+                        key={vehicleNumber}
+                        className="vehicle-section"
+                        style={{
+                          marginBottom: "25px",
+                          padding: "10px",
+                          border: "1px solid #ccc",
+                          borderRadius: "4px",
+                        }}
+                      >
                         <div
-                          className="w-full font-bold px-3 py-2 mb-1 text-sm uppercase"
+                          className="w-full font-bold px-3 py-2 mb-2 text-sm uppercase"
                           style={{
                             backgroundColor: "#fffde7",
                             border: "1px solid #ccc000",
@@ -418,7 +460,7 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
                             className="w-full"
                             style={{
                               borderCollapse: "collapse",
-                              fontSize: "13px",
+                              width: "100%",
                             }}
                           >
                             <thead>
@@ -428,50 +470,11 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
                                   color: "white",
                                 }}
                               >
-                                <th
-                                  style={{
-                                    padding: "8px",
-                                    border: "1px solid #999",
-                                    textAlign: "left",
-                                    fontWeight: "bold",
-                                    textTransform: "uppercase",
-                                  }}
-                                >
-                                  ADDRESS
-                                </th>
-                                <th
-                                  style={{
-                                    padding: "8px",
-                                    border: "1px solid #999",
-                                    textAlign: "center",
-                                    fontWeight: "bold",
-                                    textTransform: "uppercase",
-                                  }}
-                                >
-                                  QTY
-                                </th>
-                                <th
-                                  style={{
-                                    padding: "8px",
-                                    border: "1px solid #999",
-                                    textAlign: "center",
-                                    fontWeight: "bold",
-                                    textTransform: "uppercase",
-                                  }}
-                                >
-                                  RATE
-                                </th>
+                                <th style={thLeftStyle}>ADDRESS</th>
+                                <th style={thStyle}>QTY</th>
+                                <th style={thStyle}>RATE</th>
                                 {lCols.map((n) => (
-                                  <th
-                                    key={n}
-                                    style={{
-                                      padding: "8px",
-                                      border: "1px solid #999",
-                                      textAlign: "center",
-                                      fontWeight: "bold",
-                                      textTransform: "uppercase",
-                                    }}
-                                  >
+                                  <th key={n} style={thStyle}>
                                     {n.toUpperCase()}
                                   </th>
                                 ))}
@@ -493,48 +496,18 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
                                         i % 2 === 0 ? "white" : "#f5f5f5",
                                     }}
                                   >
-                                    <td
-                                      style={{
-                                        padding: "7px 8px",
-                                        border: "1px solid #bbb",
-                                        textAlign: "left",
-                                        textTransform: "uppercase",
-                                      }}
-                                    >
+                                    <td style={tdLeftStyle}>
                                       {r.address || r.customerName || "-"}
                                     </td>
-                                    <td
-                                      style={{
-                                        padding: "7px 8px",
-                                        border: "1px solid #bbb",
-                                        textAlign: "center",
-                                      }}
-                                    >
-                                      {qty}
-                                    </td>
-                                    <td
-                                      style={{
-                                        padding: "7px 8px",
-                                        border: "1px solid #bbb",
-                                        textAlign: "center",
-                                      }}
-                                    >
-                                      {rate}
-                                    </td>
+                                    <td style={tdStyle}>{qty}</td>
+                                    <td style={tdStyle}>{rate}</td>
                                     {lCols.map((name) => {
                                       const inRow = [
                                         ...(r.loadingLabours || []),
                                         ...(r.unloadingLabours || []),
                                       ].includes(name);
                                       return (
-                                        <td
-                                          key={name}
-                                          style={{
-                                            padding: "7px 8px",
-                                            border: "1px solid #bbb",
-                                            textAlign: "center",
-                                          }}
-                                        >
+                                        <td key={name} style={tdStyle}>
                                           {inRow
                                             ? `\u20B9${Math.round(rowBreakdown[name] || 0)}`
                                             : "-"}
@@ -593,53 +566,25 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
           ) : activeDates.length === 0 ? (
             <div className="text-center text-gray-400 py-10 text-sm">
               {fromDate && toDate
-                ? "কোনো ডেটা পাওয়া যায়নি"
-                : "তারিখ range সিলেক্ট করুন"}
+                ? "\u0995\u09CB\u09A8\u09CB \u09A1\u09C7\u099F\u09BE \u09AA\u09BE\u0993\u09AF\u09BC\u09BE \u09AF\u09BE\u09AF\u09BC\u09A8\u09BF"
+                : "\u09A4\u09BE\u09B0\u09BF\u0996 range \u09B8\u09BF\u09B2\u09C7\u0995\u09CD\u099F \u0995\u09B0\u09C1\u09A8"}
             </div>
           ) : (
             <>
               <div className="overflow-x-auto">
                 <table
                   className="w-full"
-                  style={{ borderCollapse: "collapse", fontSize: "13px" }}
+                  style={{ borderCollapse: "collapse", width: "100%" }}
                 >
                   <thead>
                     <tr style={{ backgroundColor: "#1b5e20", color: "white" }}>
-                      <th
-                        style={{
-                          padding: "8px",
-                          border: "1px solid #999",
-                          textAlign: "left",
-                          fontWeight: "bold",
-                          textTransform: "uppercase",
-                        }}
-                      >
-                        NAME
-                      </th>
+                      <th style={thLeftStyle}>NAME</th>
                       {activeDates.map((d) => (
-                        <th
-                          key={d}
-                          style={{
-                            padding: "8px",
-                            border: "1px solid #999",
-                            textAlign: "center",
-                            fontWeight: "bold",
-                          }}
-                        >
+                        <th key={d} style={thStyle}>
                           {fmtDateShort(d)}
                         </th>
                       ))}
-                      <th
-                        style={{
-                          padding: "8px",
-                          border: "1px solid #999",
-                          textAlign: "center",
-                          fontWeight: "bold",
-                          textTransform: "uppercase",
-                        }}
-                      >
-                        TOTAL
-                      </th>
+                      <th style={thStyle}>TOTAL</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -652,10 +597,8 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
                       >
                         <td
                           style={{
-                            padding: "7px 8px",
-                            border: "1px solid #bbb",
+                            ...tdLeftStyle,
                             fontWeight: 600,
-                            textTransform: "uppercase",
                           }}
                         >
                           {name.toUpperCase()}
@@ -663,26 +606,12 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
                         {activeDates.map((date) => {
                           const v = matrix.get(name)?.get(date);
                           return (
-                            <td
-                              key={date}
-                              style={{
-                                padding: "7px 8px",
-                                border: "1px solid #bbb",
-                                textAlign: "center",
-                              }}
-                            >
+                            <td key={date} style={tdStyle}>
                               {v ? `\u20B9${Math.round(v)}` : "-"}
                             </td>
                           );
                         })}
-                        <td
-                          style={{
-                            padding: "7px 8px",
-                            border: "1px solid #bbb",
-                            textAlign: "center",
-                            fontWeight: 600,
-                          }}
-                        >
+                        <td style={{ ...tdStyle, fontWeight: 600 }}>
                           &#x20B9;{Math.round(labourTotals.get(name) || 0)}
                         </td>
                       </tr>
