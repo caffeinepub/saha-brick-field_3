@@ -10,9 +10,6 @@ import { useState } from "react";
 import { toast } from "sonner";
 import type { CompleteDelivery } from "../App";
 
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
-
 type Props = {
   deliveries: CompleteDelivery[];
   onBack: () => void;
@@ -78,7 +75,7 @@ export default function CompleteDeliveryListPage({
       h2{text-align:center;font-size:14px;font-weight:bold;margin:4px 0;text-transform:uppercase;}
       p.date-line{text-align:center;font-size:11px;color:#555;margin-bottom:16px;}
       table{width:100%;border-collapse:collapse;margin-top:8px;}
-      th{background:#1b5e20;color:white;font-weight:bold;padding:7px 8px;text-align:left;border:1px solid #999;text-transform:uppercase;font-size:11px;}
+      th{background:#000000;color:white;font-weight:bold;padding:7px 8px;text-align:left;border:1px solid #999;text-transform:uppercase;font-size:11px;}
       td{border:1px solid #bbb;padding:6px 8px;font-size:11px;vertical-align:top;}
       tr:nth-child(even) td{background:#f5f5f5;}
       @media print{@page{size:A4 landscape;margin:10mm;}}
@@ -135,7 +132,7 @@ export default function CompleteDeliveryListPage({
       <h2 style="text-align:center;font-size:14px;font-weight:bold;margin:4px 0 2px;text-transform:uppercase;">COMPLETE DELIVERY</h2>
       <p style="text-align:center;font-size:11px;color:#555;margin-bottom:14px;">Generated: ${today} | Total: ${displayed.length}</p>
       <table style="width:100%;border-collapse:collapse;font-size:11px;">
-        <thead><tr style="background:#1b5e20;color:white;">
+        <thead><tr style="background:#000000;color:white;">
           <th style="border:1px solid #999;padding:7px 8px;text-align:left;">CUSTOMER</th>
           <th style="border:1px solid #999;padding:7px 8px;text-align:left;">ADDRESS</th>
           <th style="border:1px solid #999;padding:7px 8px;text-align:left;">DATE</th>
@@ -147,14 +144,14 @@ export default function CompleteDeliveryListPage({
         <tbody>${rows}</tbody>
       </table>`;
     document.body.appendChild(container);
-    const canvas = await html2canvas(container, {
-      scale: 2,
+    const canvas = await (window as any).html2canvas(container, {
+      scale: 3,
       useCORS: true,
       backgroundColor: "#ffffff",
     });
     document.body.removeChild(container);
     const imgData = canvas.toDataURL("image/png");
-    const doc = new jsPDF({
+    const doc = new (window as any).jspdf.jsPDF({
       unit: "mm",
       format: "a4",
       orientation: "landscape",

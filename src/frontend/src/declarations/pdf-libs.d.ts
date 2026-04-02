@@ -19,6 +19,7 @@ declare module "jspdf" {
     rect(x: number, y: number, w: number, h: number, style?: string): this;
     line(x1: number, y1: number, x2: number, y2: number): this;
     addPage(): this;
+    addImage(imageData: string, format: string, x: number, y: number, w: number, h: number): this;
     save(filename: string): void;
     lastAutoTable: { finalY: number };
   }
@@ -42,4 +43,19 @@ declare module "jspdf-autotable" {
   }
   function autoTable(doc: jsPDF, options: UserOptions): void;
   export default autoTable;
+}
+
+declare module "html2canvas" {
+  interface Options {
+    scale?: number;
+    useCORS?: boolean;
+    backgroundColor?: string | null;
+    logging?: boolean;
+    scrollX?: number;
+    scrollY?: number;
+    windowWidth?: number;
+    windowHeight?: number;
+  }
+  function html2canvas(element: HTMLElement, options?: Options): Promise<HTMLCanvasElement>;
+  export default html2canvas;
 }

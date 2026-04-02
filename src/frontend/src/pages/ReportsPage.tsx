@@ -2,9 +2,6 @@ import { ArrowLeft, Download, Printer } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { CompleteDelivery } from "../App";
 
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
-
 type Props = { completeDeliveries: CompleteDelivery[]; onBack: () => void };
 
 function fmtDate(iso: string) {
@@ -172,13 +169,13 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
       p.date-line{text-align:center;font-size:11px;color:#555;margin-bottom:12px;}
       .vehicle-section{margin-bottom:25px;padding:10px;border:1px solid #ccc;border-radius:4px;}
       table{width:100%;border-collapse:collapse;margin-bottom:6px;}
-      th{background:#1b5e20;color:white;font-weight:bold;padding:9px 10px;font-size:14px;text-align:center;border:1px solid #999;text-transform:uppercase;}
+      th{background:#000000;color:white;font-weight:bold;padding:9px 10px;font-size:14px;text-align:center;border:1px solid #999;text-transform:uppercase;}
       th.left{text-align:left;}
       td{border:1px solid #ccc;padding:6px 8px;font-size:13px;font-family:'Noto Sans',Arial,sans-serif;}
       tr:nth-child(even) td{background:#f5f5f5;}
       .vehicle-box{background:#fffde7;border:1px solid #ccc000;font-weight:bold;padding:7px 10px;margin:0 0 4px 0;font-size:13px;text-transform:uppercase;}
       .grand-total{text-align:center;font-weight:bold;font-size:15px;margin:10px 0 6px 0;text-transform:uppercase;}
-      .labour-summary{display:flex;flex-wrap:wrap;justify-content:center;gap:24px;font-size:13px;font-weight:700;margin:10px 0 16px 0;color:#1b5e20;text-transform:uppercase;padding:8px 0;border-top:2px solid #ccc;letter-spacing:0.5px;}
+      .labour-summary{display:flex;flex-wrap:wrap;justify-content:center;gap:24px;font-size:13px;font-weight:700;margin:10px 0 16px 0;color:#000000;text-transform:uppercase;padding:8px 0;border-top:2px solid #ccc;letter-spacing:0.5px;}
       @media print{@page{size:A4;margin:15mm;}}
     </style></head><body>`);
     win.document.write(el.innerHTML);
@@ -188,61 +185,178 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
   }
 
   // ── PDF ──────────────────────────────────────────────────────────────────
-  async function handleDownloadPdf() {
-    const el = document.getElementById("report-print-area");
-    if (!el) return;
+  function buildReportHtml(): string {
+    const thBase =
+      "background:#000000;color:white;font-weight:bold;padding:9px 10px;font-size:14px;text-align:center;border:1px solid #999;text-transform:uppercase;";
+    const thLeft = `${thBase}text-align:left;`;
+    const tdBase =
+      "border:1px solid #ccc;padding:6px 8px;font-size:13px;text-align:center;font-family:'Noto Sans',Arial,sans-serif;";
+    const tdLeft = `${tdBase}text-align:left;text-transform:uppercase;`;
 
+    let html = `<h1 style="text-align:center;font-size:18px;font-weight:bold;margin:0;text-transform:uppercase;">S B C O BRICK FIELD</h1>
+<h2 style="text-align:center;font-size:14px;font-weight:bold;margin:4px 0;text-transform:uppercase;">${reportTitle}</h2>
+<p style="text-align:center;font-size:11px;color:#555;margin-bottom:12px;">${dateLabel}</p>`;
+
+    if (activeTab === "daily") {
+      const globalLabourTotals = new Map<string, number>();
+      for (const [vehicleNumber, rows] of Array.from(dailyGrouped.entries())) {
+        const lColSet = new Set<string>();
+        for (const r of rows) {
+          for (const n of r.loadingLabours || []) lColSet.add(n);
+          for (const n of r.unloadingLabours || []) lColSet.add(n);
+        }
+        const lCols = Array.from(lColSet);
+        let grandSum = 0;
+        for (const r of rows) {
+          const bd = r.labourBreakdown || {};
+          grandSum += Object.values(bd).reduce(
+            (a: number, b) => a + (b as number),
+            0,
+          );
+          const rowNames = Array.from(
+            new Set([
+              ...(r.loadingLabours || []),
+              ...(r.unloadingLabours || []),
+            ]),
+          );
+          for (const name of rowNames) {
+            globalLabourTotals.set(
+              name,
+              (globalLabourTotals.get(name) || 0) +
+                ((bd as Record<string, number>)[name] || 0),
+            );
+          }
+        }
+        html += `<div style="margin-bottom:25px;padding:10px;border:1px solid #ccc;border-radius:4px;">
+<div style="background:#fffde7;border:1px solid #ccc000;font-weight:bold;padding:7px 10px;margin-bottom:4px;font-size:13px;text-transform:uppercase;">VEHICLE: ${vehicleNumber}</div>
+<table style="border-collapse:collapse;width:100%;">
+<thead><tr>
+<th style="${thLeft}">ADDRESS</th>
+<th style="${thBase}">QTY</th>
+<th style="${thBase}">RATE</th>
+${lCols.map((n) => `<th style="${thBase}">${n.toUpperCase()}</th>`).join("")}
+</tr></thead>
+<tbody>`;
+        rows.forEach((r, i) => {
+          const qty = (r.deliverItems || []).reduce(
+            (s, b) => s + (b.deliverQty || 0),
+            0,
+          );
+          const rate = r.ratePerThousand ?? 0;
+          const bd = r.labourBreakdown || {};
+          const bg = i % 2 === 0 ? "white" : "#f5f5f5";
+          html += `<tr style="background:${bg};">
+<td style="${tdLeft}">${r.address || r.customerName || "-"}</td>
+<td style="${tdBase}">${qty}</td>
+<td style="${tdBase}">${rate}</td>
+${lCols
+  .map((name) => {
+    const inRow = [
+      ...(r.loadingLabours || []),
+      ...(r.unloadingLabours || []),
+    ].includes(name);
+    return `<td style="${tdBase}">${inRow ? `₹${Math.round((bd as Record<string, number>)[name] || 0)}` : "-"}</td>`;
+  })
+  .join("")}
+</tr>`;
+        });
+        html += `</tbody></table>
+<div style="text-align:center;font-weight:bold;font-size:15px;margin:10px 0 6px;text-transform:uppercase;">GRAND TOTAL ₹${grandSum}</div>
+</div>`;
+      }
+      const summaryEntries = Array.from(globalLabourTotals.entries());
+      if (summaryEntries.length > 0) {
+        html += `<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:24px;font-weight:700;font-size:13px;color:#000000;text-transform:uppercase;border-top:2px solid #ccc;padding-top:10px;margin-top:8px;letter-spacing:0.5px;">
+${summaryEntries.map(([n, a]) => `<span>${n.toUpperCase()} ₹${Math.round(a)}</span>`).join("")}
+</div>`;
+      }
+    } else {
+      const {
+        activeDates: wDates,
+        allLabours: wLabours,
+        matrix: wMatrix,
+        labourTotals: wLabourTotals,
+        overallTotal: wTotal,
+      } = weeklyData;
+      html += `<table style="border-collapse:collapse;width:100%;">
+<thead><tr>
+<th style="${thLeft}">NAME</th>
+${wDates.map((d) => `<th style="${thBase}">${fmtDateShort(d)}</th>`).join("")}
+<th style="${thBase}">TOTAL</th>
+</tr></thead>
+<tbody>`;
+      wLabours.forEach((name, i) => {
+        const bg = i % 2 === 0 ? "white" : "#f5f5f5";
+        const lMap = wMatrix.get(name);
+        const total = wLabourTotals.get(name) || 0;
+        html += `<tr style="background:${bg};">
+<td style="${tdLeft};font-weight:600;">${name.toUpperCase()}</td>
+${wDates
+  .map((date) => {
+    const v = lMap?.get(date);
+    return `<td style="${tdBase}">${v ? `₹${Math.round(v)}` : "-"}</td>`;
+  })
+  .join("")}
+<td style="${tdBase};font-weight:bold;">₹${Math.round(total)}</td>
+</tr>`;
+      });
+      html += `</tbody></table>
+<div style="text-align:center;font-weight:bold;font-size:15px;margin:16px 0 6px;text-transform:uppercase;">GRAND TOTAL ₹${Math.round(wTotal)}</div>`;
+    }
+    return html;
+  }
+
+  async function handleDownloadPdf() {
     const fileName =
       activeTab === "daily"
         ? `daily-report-${fromDate || new Date().toISOString().slice(0, 10)}.pdf`
         : `weekly-report-${toDate || new Date().toISOString().slice(0, 10)}.pdf`;
 
-    // Temporarily expand for full render
-    const prevOverflow = el.style.overflow;
-    el.style.overflow = "visible";
+    const reportHtml = buildReportHtml();
 
-    const canvas = await html2canvas(el, {
-      scale: 2,
+    const container = document.createElement("div");
+    container.style.cssText =
+      "position:fixed;left:-9999px;top:0;width:800px;background:white;padding:20px;font-family:'Noto Sans',Arial,sans-serif;font-size:13px;";
+    container.innerHTML = reportHtml;
+    document.body.appendChild(container);
+
+    const canvas = await (window as any).html2canvas(container, {
+      scale: 3,
       useCORS: true,
       backgroundColor: "#ffffff",
-      scrollX: 0,
-      scrollY: 0,
-      windowWidth: el.scrollWidth,
-      windowHeight: el.scrollHeight,
+      logging: false,
     });
-
-    el.style.overflow = prevOverflow;
+    document.body.removeChild(container);
 
     const imgData = canvas.toDataURL("image/png");
-
-    const pageWidth = 210; // A4 mm
-    const pageHeight = 297;
-    const margin = 10;
-    const contentWidth = pageWidth - margin * 2;
-    const imgHeightMm = (canvas.height / canvas.width) * contentWidth;
-
-    const doc = new jsPDF({
+    const doc = new (window as any).jspdf.jsPDF({
       unit: "mm",
       format: "a4",
       orientation: "portrait",
     });
-
-    let yOffset = 0;
-    const pageContentHeight = pageHeight - margin * 2;
-
-    while (yOffset < imgHeightMm) {
-      if (yOffset > 0) doc.addPage();
+    const margin = 10;
+    const pageWidth = 210;
+    const pageHeight = 297;
+    const contentWidth = pageWidth - margin * 2;
+    const imgAspect = canvas.height / canvas.width;
+    const totalImgHeight = contentWidth * imgAspect;
+    const contentHeight = pageHeight - margin * 2;
+    let renderedHeight = 0;
+    let pageNum = 0;
+    while (renderedHeight < totalImgHeight) {
+      if (pageNum > 0) doc.addPage();
       doc.addImage(
         imgData,
         "PNG",
         margin,
-        margin - yOffset,
+        margin - renderedHeight,
         contentWidth,
-        imgHeightMm,
+        totalImgHeight,
       );
-      yOffset += pageContentHeight;
+      renderedHeight += contentHeight;
+      pageNum++;
+      if (pageNum > 20) break;
     }
-
     doc.save(fileName);
   }
 
@@ -442,7 +556,7 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
                             <thead>
                               <tr
                                 style={{
-                                  backgroundColor: "#1b5e20",
+                                  backgroundColor: "#000000",
                                   color: "white",
                                 }}
                               >
@@ -520,7 +634,7 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
                           gap: "24px",
                           fontWeight: 700,
                           fontSize: "13px",
-                          color: "#1b5e20",
+                          color: "#000000",
                           textTransform: "uppercase",
                           borderTop: "2px solid #ccc",
                           paddingTop: "10px",
@@ -553,7 +667,7 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
                   style={{ borderCollapse: "collapse", width: "100%" }}
                 >
                   <thead>
-                    <tr style={{ backgroundColor: "#1b5e20", color: "white" }}>
+                    <tr style={{ backgroundColor: "#000000", color: "white" }}>
                       <th style={thLeftStyle}>NAME</th>
                       {activeDates.map((d) => (
                         <th key={d} style={thStyle}>
