@@ -1,4 +1,4 @@
-import { ArrowLeft, Plus, X } from "lucide-react";
+import { ArrowLeft, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -41,6 +41,7 @@ type Props = {
   vehicles: Vehicle[];
   onSaveVehicle: (v: Omit<Vehicle, "id">) => void;
   onDeleteVehicle: (id: string) => void;
+  onEditVehicle: (id: string, v: Omit<Vehicle, "id">) => void;
 };
 
 const FieldLabel = ({
@@ -70,7 +71,8 @@ export default function Settings({
   onBack,
   vehicles,
   onSaveVehicle,
-  onDeleteVehicle: _onDeleteVehicle,
+  onDeleteVehicle,
+  onEditVehicle,
 }: Props) {
   const [activeTab, setActiveTab] = useState<Tab>("vehicle");
 
@@ -80,6 +82,18 @@ export default function Settings({
   const [unloadingInput, setUnloadingInput] = useState("");
   const [loadingLabours, setLoadingLabours] = useState<string[]>([]);
   const [unloadingLabours, setUnloadingLabours] = useState<string[]>([]);
+
+  // Edit state
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editType, setEditType] = useState<VehicleType>("Tractor");
+  const [editNumber, setEditNumber] = useState("");
+  const [editLoadingInput, setEditLoadingInput] = useState("");
+  const [editUnloadingInput, setEditUnloadingInput] = useState("");
+  const [editLoadingLabours, setEditLoadingLabours] = useState<string[]>([]);
+  const [editUnloadingLabours, setEditUnloadingLabours] = useState<string[]>(
+    [],
+  );
+
   const [rateVehicleType, setRateVehicleType] =
     useState<VehicleType>("Tractor");
   const [tractorRate, setTractorRate] = useState<TractorRate>(() => {
@@ -166,19 +180,57 @@ export default function Settings({
     setUnloadingLabours([]);
     setLoadingInput("");
     setUnloadingInput("");
-    toast.success("Vehicle সেভ হয়েছে!");
+    toast.success("Vehicle সেভ হয়েছে!", { duration: 1500 });
+  };
+
+  const startEdit = (v: Vehicle) => {
+    setEditingId(v.id);
+    setEditType(v.type);
+    setEditNumber(v.number);
+    setEditLoadingLabours([...v.loadingLabours]);
+    setEditUnloadingLabours([...v.unloadingLabours]);
+    setEditLoadingInput("");
+    setEditUnloadingInput("");
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditLoadingInput("");
+    setEditUnloadingInput("");
+  };
+
+  const saveEdit = (id: string) => {
+    if (!editNumber.trim()) {
+      toast.error("ভেহিকেল নম্বর প্রয়োজন");
+      return;
+    }
+    onEditVehicle(id, {
+      type: editType,
+      number: editNumber.trim(),
+      loadingLabours: [...editLoadingLabours],
+      unloadingLabours: [...editUnloadingLabours],
+    });
+    setEditingId(null);
+    toast.success("Vehicle আপডেট হয়েছে!", { duration: 1500 });
+  };
+
+  const handleDelete = (id: string) => {
+    if (window.confirm("এই vehicle মুছে ফেলবেন?")) {
+      onDeleteVehicle(id);
+      toast.success("Vehicle মুছে ফেলা হয়েছে!", { duration: 1500 });
+    }
   };
 
   const saveRate = () => {
     const rateData = { tractorRate, wheelRate };
     localStorage.setItem("sbf_rate", JSON.stringify(rateData));
     console.log("[Settings] Saved rate to localStorage:", rateData);
-    toast.success("Rate সেভ হয়েছে!");
+    toast.success("Rate সেভ হয়েছে!", { duration: 1500 });
   };
 
   const saveBricksRate = () => {
     localStorage.setItem("sbf_bricks_rate", JSON.stringify(bricksRate));
-    toast.success("Bricks rate সেভ হয়েছে!");
+    toast.success("Bricks rate সেভ হয়েছে!", { duration: 1500 });
   };
 
   const downloadBackup = () => {
@@ -192,7 +244,7 @@ export default function Settings({
     a.download = `saha-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    toast.success("ব্যাকআপ ডাউনলোড হয়েছে!");
+    toast.success("ব্যাকআপ ডাউনলোড হয়েছে!", { duration: 1500 });
   };
 
   const tabs: { key: Tab; label: string }[] = [
@@ -430,38 +482,297 @@ export default function Settings({
                       className="rounded-xl p-3"
                       style={{ background: "oklch(0.95 0.03 145)" }}
                     >
-                      <div className="flex items-center justify-between mb-1">
-                        <span
-                          className="text-sm font-bold"
-                          style={{ color: "oklch(0.25 0.08 145)" }}
-                        >
-                          {v.number}
-                        </span>
-                        <span
-                          className="text-xs px-2 py-0.5 rounded-full font-semibold"
-                          style={{
-                            background: "oklch(0.88 0.07 145)",
-                            color: "oklch(0.25 0.08 145)",
-                          }}
-                        >
-                          {v.type}
-                        </span>
-                      </div>
-                      {v.loadingLabours.length > 0 && (
-                        <p
-                          className="text-xs"
-                          style={{ color: "oklch(0.5 0.07 145)" }}
-                        >
-                          Loading: {v.loadingLabours.join(", ")}
-                        </p>
-                      )}
-                      {v.unloadingLabours.length > 0 && (
-                        <p
-                          className="text-xs"
-                          style={{ color: "oklch(0.5 0.08 230)" }}
-                        >
-                          Unloading: {v.unloadingLabours.join(", ")}
-                        </p>
+                      {editingId === v.id ? (
+                        /* EDIT FORM */
+                        <div className="flex flex-col gap-2">
+                          <p
+                            className="text-xs font-bold uppercase tracking-widest mb-1"
+                            style={{ color: "oklch(0.45 0.07 145)" }}
+                          >
+                            VEHICLE TYPE
+                          </p>
+                          <div className="flex gap-2 mb-1">
+                            {(["Tractor", "12 Wheel"] as VehicleType[]).map(
+                              (vt) => (
+                                <button
+                                  type="button"
+                                  key={vt}
+                                  onClick={() => setEditType(vt)}
+                                  className="flex-1 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide transition-all"
+                                  style={{
+                                    background:
+                                      editType === vt
+                                        ? "oklch(0.25 0.08 145)"
+                                        : "oklch(0.88 0.05 145)",
+                                    color:
+                                      editType === vt
+                                        ? "white"
+                                        : "oklch(0.35 0.08 145)",
+                                  }}
+                                >
+                                  {vt}
+                                </button>
+                              ),
+                            )}
+                          </div>
+
+                          <p
+                            className="text-xs font-bold uppercase tracking-widest mb-0.5"
+                            style={{ color: "oklch(0.45 0.07 145)" }}
+                          >
+                            VEHICLE NUMBER
+                          </p>
+                          <input
+                            data-ocid="settings.vehicle_edit_number.input"
+                            type="text"
+                            value={editNumber}
+                            onChange={(e) => setEditNumber(e.target.value)}
+                            className="w-full px-3 py-1.5 rounded-xl text-sm outline-none mb-1"
+                            style={{
+                              background: "oklch(0.90 0.04 145)",
+                              color: "oklch(0.2 0.07 145)",
+                            }}
+                          />
+
+                          <p
+                            className="text-xs font-bold uppercase tracking-widest mb-0.5"
+                            style={{ color: "oklch(0.45 0.07 145)" }}
+                          >
+                            LOADING LABOURS
+                          </p>
+                          <div className="flex gap-2 mb-1">
+                            <input
+                              type="text"
+                              value={editLoadingInput}
+                              onChange={(e) =>
+                                setEditLoadingInput(e.target.value)
+                              }
+                              onKeyDown={(e) => {
+                                if (
+                                  e.key === "Enter" &&
+                                  editLoadingInput.trim()
+                                ) {
+                                  setEditLoadingLabours((prev) => [
+                                    ...prev,
+                                    editLoadingInput.trim(),
+                                  ]);
+                                  setEditLoadingInput("");
+                                }
+                              }}
+                              placeholder="Add labor name"
+                              className="flex-1 px-3 py-1.5 rounded-xl text-xs outline-none"
+                              style={{
+                                background: "oklch(0.90 0.04 145)",
+                                color: "oklch(0.2 0.07 145)",
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (editLoadingInput.trim()) {
+                                  setEditLoadingLabours((prev) => [
+                                    ...prev,
+                                    editLoadingInput.trim(),
+                                  ]);
+                                  setEditLoadingInput("");
+                                }
+                              }}
+                              className="w-8 h-8 rounded-full flex items-center justify-center text-white"
+                              style={{ background: "oklch(0.25 0.08 145)" }}
+                            >
+                              <Plus size={14} />
+                            </button>
+                          </div>
+                          <div className="flex flex-wrap gap-1 mb-1">
+                            {editLoadingLabours.map((name, i) => (
+                              <span
+                                key={name}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold"
+                                style={{
+                                  background: "oklch(0.88 0.07 145)",
+                                  color: "oklch(0.25 0.08 145)",
+                                }}
+                              >
+                                {name}
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setEditLoadingLabours((prev) =>
+                                      prev.filter((_, j) => j !== i),
+                                    )
+                                  }
+                                  className="hover:opacity-70"
+                                >
+                                  <X size={10} />
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+
+                          <p
+                            className="text-xs font-bold uppercase tracking-widest mb-0.5"
+                            style={{ color: "oklch(0.45 0.07 145)" }}
+                          >
+                            UNLOADING LABOURS
+                          </p>
+                          <div className="flex gap-2 mb-1">
+                            <input
+                              type="text"
+                              value={editUnloadingInput}
+                              onChange={(e) =>
+                                setEditUnloadingInput(e.target.value)
+                              }
+                              onKeyDown={(e) => {
+                                if (
+                                  e.key === "Enter" &&
+                                  editUnloadingInput.trim()
+                                ) {
+                                  setEditUnloadingLabours((prev) => [
+                                    ...prev,
+                                    editUnloadingInput.trim(),
+                                  ]);
+                                  setEditUnloadingInput("");
+                                }
+                              }}
+                              placeholder="Add labor name"
+                              className="flex-1 px-3 py-1.5 rounded-xl text-xs outline-none"
+                              style={{
+                                background: "oklch(0.90 0.04 145)",
+                                color: "oklch(0.2 0.07 145)",
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (editUnloadingInput.trim()) {
+                                  setEditUnloadingLabours((prev) => [
+                                    ...prev,
+                                    editUnloadingInput.trim(),
+                                  ]);
+                                  setEditUnloadingInput("");
+                                }
+                              }}
+                              className="w-8 h-8 rounded-full flex items-center justify-center text-white"
+                              style={{ background: "oklch(0.45 0.12 230)" }}
+                            >
+                              <Plus size={14} />
+                            </button>
+                          </div>
+                          <div className="flex flex-wrap gap-1 mb-2">
+                            {editUnloadingLabours.map((name, i) => (
+                              <span
+                                key={name}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold"
+                                style={{
+                                  background: "oklch(0.88 0.08 230)",
+                                  color: "oklch(0.3 0.1 230)",
+                                }}
+                              >
+                                {name}
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setEditUnloadingLabours((prev) =>
+                                      prev.filter((_, j) => j !== i),
+                                    )
+                                  }
+                                  className="hover:opacity-70"
+                                >
+                                  <X size={10} />
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              data-ocid="settings.vehicle_save.button"
+                              onClick={() => saveEdit(v.id)}
+                              className="flex-1 py-2 rounded-full text-xs font-bold text-white uppercase tracking-wide"
+                              style={{ background: "oklch(0.4 0.15 145)" }}
+                            >
+                              Save
+                            </button>
+                            <button
+                              type="button"
+                              data-ocid="settings.vehicle_cancel.button"
+                              onClick={cancelEdit}
+                              className="flex-1 py-2 rounded-full text-xs font-bold uppercase tracking-wide border-2"
+                              style={{
+                                borderColor: "oklch(0.6 0.05 145)",
+                                color: "oklch(0.4 0.07 145)",
+                              }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        /* READ VIEW */
+                        <>
+                          <div className="flex items-center justify-between mb-1">
+                            <span
+                              className="text-sm font-bold"
+                              style={{ color: "oklch(0.25 0.08 145)" }}
+                            >
+                              {v.number}
+                            </span>
+                            <span
+                              className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                              style={{
+                                background: "oklch(0.88 0.07 145)",
+                                color: "oklch(0.25 0.08 145)",
+                              }}
+                            >
+                              {v.type}
+                            </span>
+                          </div>
+                          {v.loadingLabours.length > 0 && (
+                            <p
+                              className="text-xs"
+                              style={{ color: "oklch(0.5 0.07 145)" }}
+                            >
+                              Loading: {v.loadingLabours.join(", ")}
+                            </p>
+                          )}
+                          {v.unloadingLabours.length > 0 && (
+                            <p
+                              className="text-xs mb-2"
+                              style={{ color: "oklch(0.5 0.08 230)" }}
+                            >
+                              Unloading: {v.unloadingLabours.join(", ")}
+                            </p>
+                          )}
+                          <div className="flex gap-2 mt-2">
+                            <button
+                              type="button"
+                              data-ocid="settings.vehicle_edit.button"
+                              onClick={() => startEdit(v)}
+                              className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-full text-xs font-bold border-2 transition-all hover:brightness-95"
+                              style={{
+                                borderColor: "oklch(0.4 0.15 145)",
+                                color: "oklch(0.35 0.12 145)",
+                              }}
+                            >
+                              <Pencil size={12} />
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              data-ocid="settings.vehicle_delete.button"
+                              onClick={() => handleDelete(v.id)}
+                              className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-full text-xs font-bold border-2 transition-all hover:brightness-95"
+                              style={{
+                                borderColor: "oklch(0.55 0.18 25)",
+                                color: "oklch(0.45 0.18 25)",
+                              }}
+                            >
+                              <Trash2 size={12} />
+                              Delete
+                            </button>
+                          </div>
+                        </>
                       )}
                     </div>
                   ))}
@@ -720,7 +1031,9 @@ export default function Settings({
                     reader.onload = (ev) => {
                       try {
                         JSON.parse(ev.target?.result as string);
-                        toast.success("ব্যাকআপ রিস্টোর হয়েছে!");
+                        toast.success("ব্যাকআপ রিস্টোর হয়েছে!", {
+                          duration: 1500,
+                        });
                       } catch {
                         toast.error("Invalid backup file");
                       }

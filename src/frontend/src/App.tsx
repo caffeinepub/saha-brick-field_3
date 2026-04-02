@@ -276,6 +276,12 @@ export default function App() {
     setVehicles((prev) => [...prev, { ...vehicle, id: crypto.randomUUID() }]);
   };
 
+  const editVehicle = (id: string, updated: Omit<Vehicle, "id">) => {
+    setVehicles((prev) =>
+      prev.map((v) => (v.id === id ? { ...v, ...updated } : v)),
+    );
+  };
+
   const deleteVehicle = (id: string) => {
     setVehicles((prev) => prev.filter((v) => v.id !== id));
   };
@@ -468,6 +474,7 @@ export default function App() {
             vehicles={vehicles}
             onSaveVehicle={saveVehicle}
             onDeleteVehicle={deleteVehicle}
+            onEditVehicle={editVehicle}
           />
         )}
         {page === "reports" && (
