@@ -9,6 +9,18 @@
   font-display: swap;
 }
 
+@keyframes ping-fast {
+  75%,
+  100% {
+    transform: scale(2.5);
+    opacity: 0;
+  }
+}
+
+.animate-ping-fast {
+  animation: ping-fast 0.7s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
 @layer base {
   :root {
     --radius: 0.75rem;
