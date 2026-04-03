@@ -301,130 +301,144 @@ export default function CompleteDeliveryListPage({
             কোনো complete delivery নেই
           </div>
         ) : (
-          displayed.map((d) => (
-            <div key={d.id} className="bg-white rounded-2xl shadow-sm p-4">
-              {/* Top row */}
-              <div className="flex items-start justify-between mb-2">
-                <div>
-                  <div className="font-extrabold text-lg text-gray-900 leading-tight">
-                    {d.customerName}
-                  </div>
-                  <div className="flex flex-wrap gap-1.5 mt-1">
-                    <span className="bg-[#1a3c2a] text-white text-[11px] font-bold px-3 py-1 rounded-full">
-                      {d.locationType?.toUpperCase() || "LOCAL"}
-                    </span>
-                    {d.invoice && (
-                      <span className="border border-purple-300 text-purple-600 text-[11px] font-bold px-3 py-1 rounded-full">
-                        INV #{d.invoice}
+          displayed.map((d) => {
+            // Fix 2: determine if this is a pure Bats delivery
+            const isOnlyBats =
+              d.deliverItems.length > 0 &&
+              d.deliverItems.every((i) => i.type === "Bats");
+            const displayRate = isOnlyBats
+              ? (d.batsRate ?? d.ratePerThousand)
+              : d.ratePerThousand;
+
+            // Fix 3: single ₹ amount for PER LABOR
+            let perLabourDisplay: string;
+            if (
+              d.labourBreakdown &&
+              Object.keys(d.labourBreakdown).length > 0
+            ) {
+              const values = Object.values(d.labourBreakdown) as number[];
+              const allSame = values.every((v) => v === values[0]);
+              if (allSame) {
+                perLabourDisplay = `\u20B9${values[0].toFixed(0)}`;
+              } else {
+                perLabourDisplay = `\u20B9${d.perLabourAvg.toFixed(0)}`;
+              }
+            } else {
+              perLabourDisplay = `\u20B9${d.perLabourAvg.toFixed(0)}`;
+            }
+
+            return (
+              <div key={d.id} className="bg-white rounded-2xl shadow-sm p-4">
+                {/* Top row */}
+                <div className="flex items-start justify-between mb-2">
+                  <div>
+                    <div className="font-extrabold text-lg text-gray-900 leading-tight">
+                      {d.customerName}
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                      <span className="bg-[#1a3c2a] text-white text-[11px] font-bold px-3 py-1 rounded-full">
+                        {d.locationType?.toUpperCase() || "LOCAL"}
                       </span>
+                      {d.invoice && (
+                        <span className="border border-purple-300 text-purple-600 text-[11px] font-bold px-3 py-1 rounded-full">
+                          INV #{d.invoice}
+                        </span>
+                      )}
+                    </div>
+                    {d.address && (
+                      <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
+                        <span>📍</span>
+                        <span>{d.address}</span>
+                      </div>
                     )}
                   </div>
-                  {d.address && (
-                    <div className="flex items-center gap-1 text-xs text-gray-500 mt-1">
-                      <span>📍</span>
-                      <span>{d.address}</span>
-                    </div>
-                  )}
-                </div>
-                <div className="flex gap-1.5">
-                  <button
-                    type="button"
-                    className="w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center hover:bg-blue-50 bg-white shadow-sm"
-                  >
-                    <Edit2 size={14} className="text-blue-500" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(d.id)}
-                    className="w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center hover:bg-red-50 bg-white shadow-sm"
-                  >
-                    <Trash2 size={14} className="text-red-500" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Info row */}
-              <div className="bg-[#f6fbf6] border border-gray-100 rounded-xl px-3 py-2 flex flex-wrap items-center gap-2 text-xs mb-3">
-                {d.invoice && (
-                  <span className="text-gray-500">#{d.invoice}</span>
-                )}
-                {d.invoice && <span className="text-gray-300">·</span>}
-                <span className="font-semibold text-gray-700">
-                  {d.vehicleType} {d.vehicleNumber}
-                </span>
-                <span className="text-gray-300">·</span>
-                <span className="flex items-center gap-1 text-gray-600">
-                  <span>📅</span>
-                  {d.deliveryDate
-                    ? new Date(d.deliveryDate)
-                        .toLocaleDateString("en-GB")
-                        .replace(/\//g, "/")
-                    : ""}
-                </span>
-                <span className="text-gray-300">·</span>
-                <span className="bg-[#1a3c2a] text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                  {d.locationType?.toUpperCase() || "LOCAL"}
-                </span>
-              </div>
-
-              {/* Labour tags */}
-              {(d.loadingLabours.length > 0 ||
-                (d.unloadingLabours || []).length > 0) && (
-                <div className="flex flex-wrap gap-1.5 mb-3">
-                  {Array.from(
-                    new Set([
-                      ...d.loadingLabours,
-                      ...(d.unloadingLabours || []),
-                    ]),
-                  ).map((name, idx) => (
-                    <span
-                      key={`lb-${d.id}-${idx}`}
-                      className="border border-gray-300 rounded-full px-3 py-1 text-xs font-semibold text-gray-700"
+                  <div className="flex gap-1.5">
+                    <button
+                      type="button"
+                      className="w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center hover:bg-blue-50 bg-white shadow-sm"
                     >
-                      {name}
-                    </span>
-                  ))}
+                      <Edit2 size={14} className="text-blue-500" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(d.id)}
+                      className="w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center hover:bg-red-50 bg-white shadow-sm"
+                    >
+                      <Trash2 size={14} className="text-red-500" />
+                    </button>
+                  </div>
                 </div>
-              )}
 
-              {/* Stats */}
-              <div className="border-t border-gray-100 pt-3 grid grid-cols-3 gap-2">
-                <div>
-                  <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">
-                    BRICKS
-                  </div>
-                  <div className="font-extrabold text-gray-900">
-                    {d.deliverItems
-                      .reduce((s, i) => s + i.deliverQty, 0)
-                      .toLocaleString()}
-                  </div>
+                {/* Fix 1: Info row — only vehicle type+number and delivery date */}
+                <div className="bg-[#f6fbf6] border border-gray-100 rounded-xl px-3 py-2 flex flex-wrap items-center gap-2 text-xs mb-3">
+                  <span className="font-semibold text-gray-700">
+                    {d.vehicleType} {d.vehicleNumber}
+                  </span>
+                  <span className="text-gray-300">·</span>
+                  <span className="flex items-center gap-1 text-gray-600">
+                    <span>📅</span>
+                    {d.deliveryDate
+                      ? new Date(d.deliveryDate)
+                          .toLocaleDateString("en-GB")
+                          .replace(/\//g, "/")
+                      : ""}
+                  </span>
                 </div>
-                <div>
-                  <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">
-                    RATE
+
+                {/* Labour tags */}
+                {(d.loadingLabours.length > 0 ||
+                  (d.unloadingLabours || []).length > 0) && (
+                  <div className="flex flex-wrap gap-1.5 mb-3">
+                    {Array.from(
+                      new Set([
+                        ...d.loadingLabours,
+                        ...(d.unloadingLabours || []),
+                      ]),
+                    ).map((name, idx) => (
+                      <span
+                        key={`lb-${d.id}-${idx}`}
+                        className="border border-gray-300 rounded-full px-3 py-1 text-xs font-semibold text-gray-700"
+                      >
+                        {name}
+                      </span>
+                    ))}
                   </div>
-                  <div className="font-extrabold text-gray-900">
-                    {d.ratePerThousand}
+                )}
+
+                {/* Stats */}
+                <div className="border-t border-gray-100 pt-3 grid grid-cols-3 gap-2">
+                  <div>
+                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">
+                      BRICKS
+                    </div>
+                    <div className="font-extrabold text-gray-900">
+                      {d.deliverItems
+                        .reduce((s, i) => s + i.deliverQty, 0)
+                        .toLocaleString()}
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">
-                    PER LABOR
+                  <div>
+                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">
+                      RATE
+                    </div>
+                    {/* Fix 2: show batsRate for Bats-only deliveries */}
+                    <div className="font-extrabold text-gray-900">
+                      {displayRate}
+                    </div>
                   </div>
-                  <div className="font-extrabold text-gray-900 text-xs">
-                    {d.labourBreakdown &&
-                    Object.keys(d.labourBreakdown).length > 0
-                      ? Object.entries(d.labourBreakdown).map(([n, v]) => (
-                          <div key={n}>
-                            {n}: {(v as number).toFixed(2)}
-                          </div>
-                        ))
-                      : d.perLabourAvg.toFixed(2)}
+                  <div>
+                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">
+                      PER LABOR
+                    </div>
+                    {/* Fix 3: single ₹ amount */}
+                    <div className="font-extrabold text-gray-900 text-xs">
+                      {perLabourDisplay}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
