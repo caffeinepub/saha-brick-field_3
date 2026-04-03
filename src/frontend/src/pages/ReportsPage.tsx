@@ -239,7 +239,7 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
           }
         }
         html += `<div style="margin-bottom:20px;page-break-inside:avoid;border:1px solid #ccc;">
-<div style="background:#000000;color:#fff;font-weight:bold;padding:6px 10px;font-size:12px;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact;">VEHICLE: ${vehicleNumber}</div>
+<div style="margin-bottom:8px;"><span style="display:inline-block;background:#fffde7;border:2px solid #cccc00;font-weight:bold;padding:4px 12px;font-size:12px;text-transform:uppercase;">VEHICLE: ${vehicleNumber}</span></div>
 <table style="border-collapse:collapse;width:100%;">
 <thead><tr>
 <th style="${thLeft}">ADDRESS</th>
@@ -254,10 +254,10 @@ ${lCols.map((n) => `<th style="${thBase}">${n.toUpperCase()}</th>`).join("")}
             0,
           );
           const hasBatsItem = (r.deliverItems || []).some(
-            (i) => i.type === "Bats",
+            (item) => item.type === "Bats",
           );
           const rate = hasBatsItem
-            ? (r.batsRate ?? r.ratePerThousand ?? 0)
+            ? (r.batsRate ?? 0)
             : (r.ratePerThousand ?? 0);
           const bd = r.labourBreakdown || {};
           const bg = i % 2 === 1 ? "#f4f4f4" : "#ffffff";
@@ -553,15 +553,18 @@ ${wDates
                           marginBottom: "25px",
                         }}
                       >
-                        <div
-                          className="w-full font-bold px-3 py-2 mb-0 text-sm uppercase"
-                          style={{
-                            backgroundColor: "#fffde7",
-                            border: "2px solid #cccc00",
-                            marginBottom: "8px",
-                          }}
-                        >
-                          VEHICLE: {vehicleNumber}
+                        <div style={{ marginBottom: "8px" }}>
+                          <span
+                            className="font-bold text-sm uppercase"
+                            style={{
+                              display: "inline-block",
+                              backgroundColor: "#fffde7",
+                              border: "2px solid #cccc00",
+                              padding: "4px 12px",
+                            }}
+                          >
+                            VEHICLE: {vehicleNumber}
+                          </span>
                         </div>
                         <div className="overflow-x-auto">
                           <table
@@ -595,10 +598,10 @@ ${wDates
                                   0,
                                 );
                                 const hasBatsItem = (r.deliverItems || []).some(
-                                  (i) => i.type === "Bats",
+                                  (item) => item.type === "Bats",
                                 );
                                 const rate = hasBatsItem
-                                  ? (r.batsRate ?? r.ratePerThousand ?? 0)
+                                  ? (r.batsRate ?? 0)
                                   : (r.ratePerThousand ?? 0);
                                 const rowBreakdown = r.labourBreakdown || {};
                                 return (
