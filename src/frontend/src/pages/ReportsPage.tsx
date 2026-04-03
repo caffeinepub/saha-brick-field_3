@@ -1,8 +1,7 @@
-import html2canvas from "html2canvas";
-import { jsPDF } from "jspdf";
 import { ArrowLeft, Download, Printer } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { CompleteDelivery } from "../App";
+import { downloadHtmlAsPdf } from "../utils/downloadPdf";
 
 type Props = { completeDeliveries: CompleteDelivery[]; onBack: () => void };
 
@@ -328,53 +327,10 @@ ${wDates
         activeTab === "daily"
           ? `daily-report-${fromDate || new Date().toISOString().slice(0, 10)}.pdf`
           : `weekly-report-${toDate || new Date().toISOString().slice(0, 10)}.pdf`;
-
-      const reportHtml = buildReportHtml();
-
-      const container = document.createElement("div");
-      container.style.cssText =
-        "position:fixed;left:-9999px;top:0;width:800px;background:white;padding:20px;font-family:'Noto Sans',Arial,sans-serif;font-size:13px;";
-      container.innerHTML = reportHtml;
-      document.body.appendChild(container);
-
-      const canvas = await html2canvas(container, {
-        scale: 3,
-        useCORS: true,
-        backgroundColor: "#ffffff",
-        logging: false,
+      await downloadHtmlAsPdf(buildReportHtml(), {
+        filename: fileName,
+        containerWidth: 800,
       });
-      document.body.removeChild(container);
-
-      const imgData = canvas.toDataURL("image/png");
-      const doc = new jsPDF({
-        unit: "mm",
-        format: "a4",
-        orientation: "portrait",
-      });
-      const margin = 10;
-      const pageWidth = 210;
-      const pageHeight = 297;
-      const contentWidth = pageWidth - margin * 2;
-      const imgAspect = canvas.height / canvas.width;
-      const totalImgHeight = contentWidth * imgAspect;
-      const contentHeight = pageHeight - margin * 2;
-      let renderedHeight = 0;
-      let pageNum = 0;
-      while (renderedHeight < totalImgHeight) {
-        if (pageNum > 0) doc.addPage();
-        doc.addImage(
-          imgData,
-          "PNG",
-          margin,
-          margin - renderedHeight,
-          contentWidth,
-          totalImgHeight,
-        );
-        renderedHeight += contentHeight;
-        pageNum++;
-        if (pageNum > 20) break;
-      }
-      doc.save(fileName);
     } catch (err) {
       console.error("PDF generation failed:", err);
     }

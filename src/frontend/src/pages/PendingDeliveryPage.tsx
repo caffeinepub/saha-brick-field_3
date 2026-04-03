@@ -1,5 +1,3 @@
-import html2canvas from "html2canvas";
-import { jsPDF } from "jspdf";
 import {
   ArrowLeft,
   Calendar,
@@ -11,6 +9,7 @@ import {
 import { useState } from "react";
 import { toast } from "sonner";
 import type { PendingDelivery } from "../App";
+import { downloadHtmlAsPdf } from "../utils/downloadPdf";
 
 type Props = {
   deliveries: PendingDelivery[];
@@ -117,9 +116,6 @@ export default function PendingDeliveryPage({
 
   async function handleDownloadPdf() {
     try {
-      const container = document.createElement("div");
-      container.style.cssText =
-        "position:fixed;left:-9999px;top:0;width:794px;background:white;padding:20px;font-family:'Noto Sans',Arial,sans-serif;font-size:12px;";
       const today = new Date().toLocaleDateString("en-GB");
       const rows = displayed
         .map((d) => {
@@ -136,58 +132,25 @@ export default function PendingDeliveryPage({
         </tr>`;
         })
         .join("");
-      container.innerHTML = `
+      const html = `
         <h1 style="text-align:center;font-size:18px;font-weight:bold;margin:0 0 4px;text-transform:uppercase;">S B C O BRICK FIELD</h1>
         <h2 style="text-align:center;font-size:14px;font-weight:bold;margin:0 0 4px;text-transform:uppercase;">PENDING DELIVERY</h2>
         <p style="text-align:center;font-size:11px;color:#555;margin:0 0 14px;">Generated: ${today} | Total: ${displayed.length}</p>
         <table style="width:100%;border-collapse:collapse;font-size:12px;">
-          <thead><tr style="background:#000000;color:white;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
-            <th style="border:1px solid #333;padding:8px 10px;text-align:left;font-weight:bold;text-transform:uppercase;background:#000;color:#fff;-webkit-print-color-adjust:exact;">CUSTOMER NAME</th>
-            <th style="border:1px solid #333;padding:8px 10px;text-align:left;font-weight:bold;text-transform:uppercase;background:#000;color:#fff;-webkit-print-color-adjust:exact;">ADDRESS</th>
-            <th style="border:1px solid #333;padding:8px 10px;text-align:left;font-weight:bold;text-transform:uppercase;background:#000;color:#fff;-webkit-print-color-adjust:exact;">DATE</th>
-            <th style="border:1px solid #333;padding:8px 10px;text-align:left;font-weight:bold;text-transform:uppercase;background:#000;color:#fff;-webkit-print-color-adjust:exact;">LOCATION</th>
-            <th style="border:1px solid #333;padding:8px 10px;text-align:left;font-weight:bold;text-transform:uppercase;background:#000;color:#fff;-webkit-print-color-adjust:exact;">ITEMS</th>
+          <thead><tr style="background:#000000;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
+            <th style="border:1px solid #333;padding:8px 10px;text-align:left;font-weight:bold;text-transform:uppercase;background:#000;color:#fff;">CUSTOMER NAME</th>
+            <th style="border:1px solid #333;padding:8px 10px;text-align:left;font-weight:bold;text-transform:uppercase;background:#000;color:#fff;">ADDRESS</th>
+            <th style="border:1px solid #333;padding:8px 10px;text-align:left;font-weight:bold;text-transform:uppercase;background:#000;color:#fff;">DATE</th>
+            <th style="border:1px solid #333;padding:8px 10px;text-align:left;font-weight:bold;text-transform:uppercase;background:#000;color:#fff;">LOCATION</th>
+            <th style="border:1px solid #333;padding:8px 10px;text-align:left;font-weight:bold;text-transform:uppercase;background:#000;color:#fff;">ITEMS</th>
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>`;
-      document.body.appendChild(container);
-      const canvas = await html2canvas(container, {
-        scale: 3,
-        useCORS: true,
-        backgroundColor: "#ffffff",
-      });
-      document.body.removeChild(container);
-      const imgData = canvas.toDataURL("image/png");
-      const doc = new jsPDF({
-        unit: "mm",
-        format: "a4",
-        orientation: "portrait",
-      });
-      const margin = 10;
-      const pageWidth = 210;
-      const pageHeight = 297;
-      const contentWidth = pageWidth - margin * 2;
-      const imgAspect = canvas.height / canvas.width;
-      const totalImgHeight = contentWidth * imgAspect;
-      const contentHeight = pageHeight - margin * 2;
-      let renderedHeight = 0;
-      let pageNum = 0;
-      while (renderedHeight < totalImgHeight) {
-        if (pageNum > 0) doc.addPage();
-        doc.addImage(
-          imgData,
-          "PNG",
-          margin,
-          margin - renderedHeight,
-          contentWidth,
-          totalImgHeight,
-        );
-        renderedHeight += contentHeight;
-        pageNum++;
-        if (pageNum > 20) break;
-      }
       const dateStr = new Date().toISOString().slice(0, 10);
-      doc.save(`pending-delivery-${dateStr}.pdf`);
+      await downloadHtmlAsPdf(html, {
+        filename: `pending-delivery-${dateStr}.pdf`,
+        containerWidth: 794,
+      });
     } catch (err) {
       console.error("PDF generation failed:", err);
     }
