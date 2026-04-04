@@ -1,4 +1,5 @@
-import { ArrowLeft, Printer } from "lucide-react";
+import html2pdf from "html2pdf.js";
+import { ArrowLeft, Download, Printer } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { CompleteDelivery } from "../App";
 
@@ -193,6 +194,27 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
     setTimeout(() => win.print(), 300);
   }
 
+  async function handleDownloadPdf() {
+    const el = document.getElementById("report-print-area");
+    if (!el) return;
+    const title = activeTab === "daily" ? "daily-report" : "weekly-report";
+    try {
+      await html2pdf()
+        .set({
+          margin: 10,
+          filename: `${title}.pdf`,
+          image: { type: "jpeg", quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true, logging: false },
+          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+          pagebreak: { mode: ["avoid-all", "css"] },
+        })
+        .from(el)
+        .save();
+    } catch (e) {
+      console.error("PDF error:", e);
+    }
+  }
+
   const { activeDates, allLabours, matrix, labourTotals, overallTotal } =
     weeklyData;
 
@@ -292,6 +314,14 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
           >
             <Printer size={16} />
             PRINT
+          </button>
+          <button
+            type="button"
+            onClick={handleDownloadPdf}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2 rounded shadow text-sm"
+          >
+            <Download size={16} />
+            PDF
           </button>
         </div>
 
@@ -429,7 +459,7 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
                                       return (
                                         <td key={name} style={tdStyle}>
                                           {inRow
-                                            ? `\u20B9${Math.round(rowBreakdown[name] || 0)}`
+                                            ? `\u20B9${Number.parseFloat((rowBreakdown[name] || 0).toFixed(2))}`
                                             : "-"}
                                         </td>
                                       );
@@ -479,7 +509,8 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
                       >
                         {summaryEntries.map(([n, a]) => (
                           <span key={n}>
-                            {n.toUpperCase()} &#x20B9;{Math.round(a)}
+                            {n.toUpperCase()} &#x20B9;
+                            {Number.parseFloat(a.toFixed(2))}
                           </span>
                         ))}
                       </div>
@@ -532,12 +563,17 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
                           const v = matrix.get(name)?.get(date);
                           return (
                             <td key={date} style={tdStyle}>
-                              {v ? `\u20B9${Math.round(v)}` : "-"}
+                              {v
+                                ? `\u20B9${Number.parseFloat(v.toFixed(2))}`
+                                : "-"}
                             </td>
                           );
                         })}
                         <td style={{ ...tdStyle, fontWeight: 600 }}>
-                          &#x20B9;{Math.round(labourTotals.get(name) || 0)}
+                          &#x20B9;
+                          {Number.parseFloat(
+                            (labourTotals.get(name) || 0).toFixed(2),
+                          )}
                         </td>
                       </tr>
                     ))}

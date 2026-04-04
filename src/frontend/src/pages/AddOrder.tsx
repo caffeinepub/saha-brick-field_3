@@ -190,8 +190,8 @@ export default function AddOrder({ onSubmit, onBack }: Props) {
                 {format(orderDate, "dd/MM/yyyy")}
               </button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <div className="p-2 [--cell-size:44px] text-base">
+            <PopoverContent className="w-[340px] p-0" align="start">
+              <div className="p-3 [--cell-size:42px] text-base">
                 <Calendar
                   mode="single"
                   selected={orderDate}
@@ -278,8 +278,8 @@ export default function AddOrder({ onSubmit, onBack }: Props) {
                     : "Select date"}
                 </button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <div className="p-2 [--cell-size:44px] text-base">
+              <PopoverContent className="w-[340px] p-0" align="start">
+                <div className="p-3 [--cell-size:42px] text-base">
                   <Calendar
                     mode="single"
                     selected={approxDate}

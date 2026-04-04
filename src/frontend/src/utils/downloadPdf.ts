@@ -39,7 +39,6 @@ export async function downloadHtmlAsPdf(
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     // Use Function to avoid TS module resolution error for optional dependency
-    // biome-ignore lint/security/noGlobalEval: intentional optional import
     const html2pdf = await new Function("m", "return import(m)")(
       "html2pdf.js",
     ).then((m: any) => m.default);

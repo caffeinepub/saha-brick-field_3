@@ -1,5 +1,13 @@
-import { ArrowLeft, Calendar, Edit2, Printer, Trash2 } from "lucide-react";
-import { useState } from "react";
+import html2pdf from "html2pdf.js";
+import {
+  ArrowLeft,
+  Calendar,
+  Download,
+  Edit2,
+  Printer,
+  Trash2,
+} from "lucide-react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import type { PendingDelivery } from "../App";
 
@@ -106,6 +114,33 @@ export default function PendingDeliveryPage({
     setTimeout(() => win.print(), 300);
   }
 
+  async function handleDownloadPdf() {
+    const container = document.createElement("div");
+    container.innerHTML = buildPrintHtml().replace(
+      /<html[^>]*>|<\/html>|<head>[\s\S]*?<\/head>|<body[^>]*>|<\/body>/gi,
+      "",
+    );
+    container.style.cssText =
+      "position:fixed;left:-9999px;top:0;width:794px;background:#fff;font-family:Arial,sans-serif;padding:10mm;";
+    document.body.appendChild(container);
+    try {
+      await html2pdf()
+        .set({
+          margin: 10,
+          filename: "pending-delivery.pdf",
+          image: { type: "jpeg", quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true },
+          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+        })
+        .from(container)
+        .save();
+    } catch (_e) {
+      toast.error("PDF download ব্যর্থ হয়েছে");
+    } finally {
+      document.body.removeChild(container);
+    }
+  }
+
   return (
     <div className="flex flex-col flex-1 pb-16 bg-[#edf5ed] min-h-screen">
       <header className="bg-[#1a3c2a] text-white px-4 py-3 flex items-center justify-between">
@@ -122,8 +157,17 @@ export default function PendingDeliveryPage({
             type="button"
             onClick={handlePrint}
             className="w-8 h-8 rounded-full bg-[#2e5c40] flex items-center justify-center hover:bg-[#3a7050]"
+            title="Print"
           >
             <Printer size={15} />
+          </button>
+          <button
+            type="button"
+            onClick={handleDownloadPdf}
+            className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center hover:bg-blue-700"
+            title="Download PDF"
+          >
+            <Download size={15} />
           </button>
           <div className="w-8 h-8 rounded-full bg-[#2e5c40] flex items-center justify-center font-bold text-sm">
             {displayed.length}

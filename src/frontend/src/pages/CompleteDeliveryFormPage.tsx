@@ -145,15 +145,17 @@ export default function CompleteDeliveryFormPage({
   for (const name of allLabourNames) {
     const inLoading = loadingLabours.includes(name);
     const inUnloading = unloadingLabours.includes(name);
-    labourBreakdown[name] =
-      Math.round(
-        ((inLoading ? perLoadingLabour : 0) +
-          (inUnloading ? perUnloadingLabour : 0)) *
-          100,
-      ) / 100;
+    labourBreakdown[name] = Number.parseFloat(
+      (
+        (inLoading ? perLoadingLabour : 0) +
+        (inUnloading ? perUnloadingLabour : 0)
+      ).toFixed(2),
+    );
   }
   const perLabourAvg =
-    totalLabours > 0 ? Math.round((totalAmount / totalLabours) * 100) / 100 : 0;
+    totalLabours > 0
+      ? Number.parseFloat((totalAmount / totalLabours).toFixed(2))
+      : 0;
 
   const handleSave = () => {
     if (!selectedVehicle && filteredVehicles.length > 0) {
