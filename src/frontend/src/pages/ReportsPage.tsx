@@ -1,7 +1,6 @@
-import { ArrowLeft, Download, Printer } from "lucide-react";
+import { ArrowLeft, Printer } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { CompleteDelivery } from "../App";
-import { downloadHtmlAsPdf } from "../utils/downloadPdf";
 
 type Props = { completeDeliveries: CompleteDelivery[]; onBack: () => void };
 
@@ -194,148 +193,6 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
     setTimeout(() => win.print(), 300);
   }
 
-  // ── PDF ──────────────────────────────────────────────────────────────────
-  function buildReportHtml(): string {
-    const thBase =
-      "background:#000000;color:#fff;font-weight:bold;padding:8px 10px;font-size:12px;text-align:center;border:1px solid #333;text-transform:uppercase;-webkit-print-color-adjust:exact;print-color-adjust:exact;";
-    const thLeft = `${thBase}text-align:left;`;
-    const tdBase =
-      "border:1px solid #ccc;padding:6px 8px;font-size:11px;text-align:right;font-family:'Noto Sans',Arial,sans-serif;color:#000;";
-    const tdLeft = `${tdBase}text-align:left;text-transform:uppercase;`;
-
-    let html = `<h1 style="text-align:center;font-size:18px;font-weight:bold;margin:0;text-transform:uppercase;">S B C O BRICK FIELD</h1>
-<h2 style="text-align:center;font-size:14px;font-weight:bold;margin:4px 0;text-transform:uppercase;">${reportTitle}</h2>
-<p style="text-align:center;font-size:11px;color:#555;margin-bottom:12px;">${dateLabel}</p>`;
-
-    if (activeTab === "daily") {
-      const globalLabourTotals = new Map<string, number>();
-      for (const [vehicleNumber, rows] of Array.from(dailyGrouped.entries())) {
-        const lColSet = new Set<string>();
-        for (const r of rows) {
-          for (const n of r.loadingLabours || []) lColSet.add(n);
-          for (const n of r.unloadingLabours || []) lColSet.add(n);
-        }
-        const lCols = Array.from(lColSet);
-        let grandSum = 0;
-        for (const r of rows) {
-          const bd = r.labourBreakdown || {};
-          grandSum += Object.values(bd).reduce(
-            (a: number, b) => a + (b as number),
-            0,
-          );
-          const rowNames = Array.from(
-            new Set([
-              ...(r.loadingLabours || []),
-              ...(r.unloadingLabours || []),
-            ]),
-          );
-          for (const name of rowNames) {
-            globalLabourTotals.set(
-              name,
-              (globalLabourTotals.get(name) || 0) +
-                ((bd as Record<string, number>)[name] || 0),
-            );
-          }
-        }
-        html += `<div style="margin-bottom:20px;page-break-inside:avoid;border:1px solid #ccc;">
-<div style="margin-bottom:8px;"><span style="display:inline-block;background:#fffde7;border:2px solid #cccc00;font-weight:bold;padding:4px 12px;font-size:12px;text-transform:uppercase;">VEHICLE: ${vehicleNumber}</span></div>
-<table style="border-collapse:collapse;width:100%;">
-<thead><tr>
-<th style="${thLeft}">ADDRESS</th>
-<th style="${thBase}">QTY</th>
-<th style="${thBase}">RATE</th>
-${lCols.map((n) => `<th style="${thBase}">${n.toUpperCase()}</th>`).join("")}
-</tr></thead>
-<tbody>`;
-        rows.forEach((r, i) => {
-          const qty = (r.deliverItems || []).reduce(
-            (s, b) => s + (b.deliverQty || 0),
-            0,
-          );
-          const hasBatsItem = (r.deliverItems || []).some(
-            (item) => item.type === "Bats",
-          );
-          const rate = hasBatsItem
-            ? (r.batsRate ?? 0)
-            : (r.ratePerThousand ?? 0);
-          const bd = r.labourBreakdown || {};
-          const bg = i % 2 === 1 ? "#f4f4f4" : "#ffffff";
-          html += `<tr style="background:${bg};-webkit-print-color-adjust:exact;">
-<td style="${tdLeft}">${r.address || r.customerName || "-"}</td>
-<td style="${tdBase}">${qty}</td>
-<td style="${tdBase}">${rate}</td>
-${lCols
-  .map((name) => {
-    const inRow = [
-      ...(r.loadingLabours || []),
-      ...(r.unloadingLabours || []),
-    ].includes(name);
-    return `<td style="${tdBase}">${inRow ? `₹${Math.round((bd as Record<string, number>)[name] || 0)}` : "-"}</td>`;
-  })
-  .join("")}
-</tr>`;
-        });
-        html += `</tbody></table>
-<div style="text-align:center;font-weight:bold;font-size:14px;margin:10px 0 6px;text-transform:uppercase;border-top:2px solid #000;padding-top:8px;">GRAND TOTAL ₹${grandSum}</div>
-</div>`;
-      }
-      const summaryEntries = Array.from(globalLabourTotals.entries());
-      if (summaryEntries.length > 0) {
-        html += `<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:20px;font-weight:700;font-size:12px;color:#000000;text-transform:uppercase;border-top:1px solid #ccc;padding:8px 0;letter-spacing:0.5px;">
-${summaryEntries.map(([n, a]) => `<span>${n.toUpperCase()} ₹${Math.round(a)}</span>`).join("")}
-</div>`;
-      }
-    } else {
-      const {
-        activeDates: wDates,
-        allLabours: wLabours,
-        matrix: wMatrix,
-        labourTotals: wLabourTotals,
-        overallTotal: wTotal,
-      } = weeklyData;
-      html += `<table style="border-collapse:collapse;width:100%;">
-<thead><tr>
-<th style="${thLeft}">NAME</th>
-${wDates.map((d) => `<th style="${thBase}">${fmtDateShort(d)}</th>`).join("")}
-<th style="${thBase}">TOTAL</th>
-</tr></thead>
-<tbody>`;
-      wLabours.forEach((name, i) => {
-        const bg = i % 2 === 1 ? "#f4f4f4" : "#ffffff";
-        const lMap = wMatrix.get(name);
-        const total = wLabourTotals.get(name) || 0;
-        html += `<tr style="background:${bg};">
-<td style="${tdLeft};font-weight:600;">${name.toUpperCase()}</td>
-${wDates
-  .map((date) => {
-    const v = lMap?.get(date);
-    return `<td style="${tdBase}">${v ? `₹${Math.round(v)}` : "-"}</td>`;
-  })
-  .join("")}
-<td style="${tdBase};font-weight:bold;">₹${Math.round(total)}</td>
-</tr>`;
-      });
-      html += `</tbody></table>
-<div style="text-align:center;font-weight:bold;font-size:14px;margin:10px 0 6px;text-transform:uppercase;border-top:2px solid #000;padding-top:8px;">GRAND TOTAL ₹${Math.round(wTotal)}</div>`;
-    }
-    return html;
-  }
-
-  async function handleDownloadPdf() {
-    try {
-      const fileName =
-        activeTab === "daily"
-          ? `daily-report-${fromDate || new Date().toISOString().slice(0, 10)}.pdf`
-          : `weekly-report-${toDate || new Date().toISOString().slice(0, 10)}.pdf`;
-      await downloadHtmlAsPdf(buildReportHtml(), {
-        filename: fileName,
-        containerWidth: 800,
-      });
-    } catch (err) {
-      console.error("PDF generation failed:", err);
-    }
-  }
-
   const { activeDates, allLabours, matrix, labourTotals, overallTotal } =
     weeklyData;
 
@@ -401,9 +258,9 @@ ${wDates
 
       <div className="p-4 bg-gray-50 flex-1">
         {/* Filters */}
-        <div className="flex items-center gap-3 mb-4 flex-wrap">
+        <div className="flex items-center gap-2 mb-4">
           <div className="flex items-center gap-1">
-            <span className="text-sm font-semibold text-gray-700">FROM:</span>
+            <span className="text-sm font-semibold text-gray-700">FROM</span>
             <input
               type="date"
               data-ocid="reports.from_date.input"
@@ -412,9 +269,9 @@ ${wDates
               className="border border-gray-300 rounded px-2 py-1 text-sm"
             />
           </div>
-          <span className="text-gray-500 font-bold">&rarr;</span>
+          <span className="text-gray-400 font-bold">/</span>
           <div className="flex items-center gap-1">
-            <span className="text-sm font-semibold text-gray-700">TO:</span>
+            <span className="text-sm font-semibold text-gray-700">TO</span>
             <input
               type="date"
               data-ocid="reports.to_date.input"
@@ -435,15 +292,6 @@ ${wDates
           >
             <Printer size={16} />
             PRINT
-          </button>
-          <button
-            type="button"
-            data-ocid="reports.download_pdf.button"
-            onClick={handleDownloadPdf}
-            className="flex items-center gap-2 bg-blue-800 hover:bg-blue-900 text-white font-bold px-5 py-2 rounded shadow text-sm"
-          >
-            <Download size={16} />
-            DOWNLOAD PDF
           </button>
         </div>
 

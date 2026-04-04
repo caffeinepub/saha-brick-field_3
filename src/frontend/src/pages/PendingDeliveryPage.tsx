@@ -1,15 +1,7 @@
-import {
-  ArrowLeft,
-  Calendar,
-  Download,
-  Edit2,
-  Printer,
-  Trash2,
-} from "lucide-react";
+import { ArrowLeft, Calendar, Edit2, Printer, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import type { PendingDelivery } from "../App";
-import { downloadHtmlAsPdf } from "../utils/downloadPdf";
 
 type Props = {
   deliveries: PendingDelivery[];
@@ -114,48 +106,6 @@ export default function PendingDeliveryPage({
     setTimeout(() => win.print(), 300);
   }
 
-  async function handleDownloadPdf() {
-    try {
-      const today = new Date().toLocaleDateString("en-GB");
-      const rows = displayed
-        .map((d) => {
-          const items = (d.deliverItems || [])
-            .map((i) => `${i.type}: ${i.deliverQty.toLocaleString()}`)
-            .join(", ");
-          const bg = displayed.indexOf(d) % 2 === 1 ? "#f4f4f4" : "#fff";
-          return `<tr style="background:${bg};">
-          <td style="border:1px solid #ccc;padding:6px 8px;text-align:left;">${d.customerName}</td>
-          <td style="border:1px solid #ccc;padding:6px 8px;text-align:left;">${d.address || "-"}</td>
-          <td style="border:1px solid #ccc;padding:6px 8px;text-align:left;">${d.pendingDate || "-"}</td>
-          <td style="border:1px solid #ccc;padding:6px 8px;text-align:left;">${d.locationType?.toUpperCase() || "-"}</td>
-          <td style="border:1px solid #ccc;padding:6px 8px;text-align:left;">${items || "-"}</td>
-        </tr>`;
-        })
-        .join("");
-      const html = `
-        <h1 style="text-align:center;font-size:18px;font-weight:bold;margin:0 0 4px;text-transform:uppercase;">S B C O BRICK FIELD</h1>
-        <h2 style="text-align:center;font-size:14px;font-weight:bold;margin:0 0 4px;text-transform:uppercase;">PENDING DELIVERY</h2>
-        <p style="text-align:center;font-size:11px;color:#555;margin:0 0 14px;">Generated: ${today} | Total: ${displayed.length}</p>
-        <table style="width:100%;border-collapse:collapse;font-size:12px;">
-          <thead><tr style="background:#000000;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
-            <th style="border:1px solid #333;padding:8px 10px;text-align:left;font-weight:bold;text-transform:uppercase;background:#000;color:#fff;">CUSTOMER NAME</th>
-            <th style="border:1px solid #333;padding:8px 10px;text-align:left;font-weight:bold;text-transform:uppercase;background:#000;color:#fff;">ADDRESS</th>
-            <th style="border:1px solid #333;padding:8px 10px;text-align:left;font-weight:bold;text-transform:uppercase;background:#000;color:#fff;">DATE</th>
-            <th style="border:1px solid #333;padding:8px 10px;text-align:left;font-weight:bold;text-transform:uppercase;background:#000;color:#fff;">LOCATION</th>
-            <th style="border:1px solid #333;padding:8px 10px;text-align:left;font-weight:bold;text-transform:uppercase;background:#000;color:#fff;">ITEMS</th>
-          </tr></thead>
-          <tbody>${rows}</tbody>
-        </table>`;
-      const dateStr = new Date().toISOString().slice(0, 10);
-      await downloadHtmlAsPdf(html, {
-        filename: `pending-delivery-${dateStr}.pdf`,
-        containerWidth: 794,
-      });
-    } catch (err) {
-      console.error("PDF generation failed:", err);
-    }
-  }
-
   return (
     <div className="flex flex-col flex-1 pb-16 bg-[#edf5ed] min-h-screen">
       <header className="bg-[#1a3c2a] text-white px-4 py-3 flex items-center justify-between">
@@ -174,13 +124,6 @@ export default function PendingDeliveryPage({
             className="w-8 h-8 rounded-full bg-[#2e5c40] flex items-center justify-center hover:bg-[#3a7050]"
           >
             <Printer size={15} />
-          </button>
-          <button
-            type="button"
-            onClick={handleDownloadPdf}
-            className="w-8 h-8 rounded-full bg-[#2e5c40] flex items-center justify-center hover:bg-[#3a7050]"
-          >
-            <Download size={15} />
           </button>
           <div className="w-8 h-8 rounded-full bg-[#2e5c40] flex items-center justify-center font-bold text-sm">
             {displayed.length}

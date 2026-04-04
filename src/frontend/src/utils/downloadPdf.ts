@@ -37,8 +37,12 @@ export async function downloadHtmlAsPdf(
   document.body.appendChild(container);
 
   try {
-    // biome-ignore lint/suspicious/noExplicitAny: third-party CJS module
-    const html2pdf = (await import("html2pdf.js")).default as any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // Use Function to avoid TS module resolution error for optional dependency
+    // biome-ignore lint/security/noGlobalEval: intentional optional import
+    const html2pdf = await new Function("m", "return import(m)")(
+      "html2pdf.js",
+    ).then((m: any) => m.default);
 
     await html2pdf()
       .set({
