@@ -185,7 +185,7 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
       td.center{text-align:center;}
       tr.even td{background:#f4f4f4!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
       .grand-total{text-align:center;font-weight:bold;font-size:14px;margin:10px 0 6px;text-transform:uppercase;border-top:2px solid #000;padding-top:8px;}
-      .labour-summary{display:flex;flex-wrap:wrap;justify-content:center;gap:20px;font-weight:700;font-size:12px;text-transform:uppercase;border-top:1px solid #ccc;padding:8px 0;letter-spacing:0.5px;}
+      .labour-summary{display:flex;flex-wrap:wrap;justify-content:flex-start;gap:10px;font-weight:700;font-size:13px;text-transform:uppercase;border-top:2px solid #ccc;padding:10px 0 8px 0;letter-spacing:0.3px;}
       @media print{@page{size:A4;margin:10mm;}body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}.section{page-break-inside:avoid;}tbody tr{page-break-inside:avoid;}th{background:#000!important;color:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}tr.even td{background:#f4f4f4!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}.vehicle-label{background:#000!important;color:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
     </style></head><body>`);
     win.document.write(el.innerHTML);
@@ -495,8 +495,8 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
                         style={{
                           display: "flex",
                           flexWrap: "wrap",
-                          justifyContent: "center",
-                          gap: "24px",
+                          justifyContent: "flex-start",
+                          gap: "10px",
                           fontWeight: 700,
                           fontSize: "13px",
                           color: "#000000",
@@ -504,7 +504,7 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
                           borderTop: "2px solid #ccc",
                           paddingTop: "10px",
                           marginTop: "8px",
-                          letterSpacing: "0.5px",
+                          letterSpacing: "0.3px",
                         }}
                       >
                         {summaryEntries.map(([n, a]) => (

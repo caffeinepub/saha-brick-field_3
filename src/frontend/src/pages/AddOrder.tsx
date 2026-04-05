@@ -8,7 +8,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { format } from "date-fns";
-import { ArrowLeft, CalendarIcon } from "lucide-react";
+import { ArrowLeft, CalendarIcon, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { BrickItem, Order } from "../App";
@@ -190,8 +190,16 @@ export default function AddOrder({ onSubmit, onBack }: Props) {
                 {format(orderDate, "dd/MM/yyyy")}
               </button>
             </PopoverTrigger>
-            <PopoverContent className="w-[340px] p-0" align="start">
-              <div className="p-3 [--cell-size:42px] text-base">
+            <PopoverContent
+              className="p-0"
+              align="start"
+              style={{ width: "auto", zIndex: 9999 }}
+              onInteractOutside={(e) => {
+                e.preventDefault();
+                setOrderDateOpen(false);
+              }}
+            >
+              <div className="p-2">
                 <Calendar
                   mode="single"
                   selected={orderDate}
@@ -202,6 +210,7 @@ export default function AddOrder({ onSubmit, onBack }: Props) {
                     }
                   }}
                   initialFocus
+                  className="rounded-md"
                 />
               </div>
             </PopoverContent>
@@ -261,37 +270,57 @@ export default function AddOrder({ onSubmit, onBack }: Props) {
             </div>
           </div>
 
-          {/* Approx Delivery Date */}
+          {/* Approx Delivery Date - full width, separate row */}
           <div>
             <Label className="text-[10px] font-bold tracking-widest text-gray-500 uppercase">
               APPROX DELIVERY DATE
             </Label>
-            <Popover open={approxDateOpen} onOpenChange={setApproxDateOpen}>
-              <PopoverTrigger asChild>
+            <div className="flex items-center gap-2 mt-2">
+              <Popover open={approxDateOpen} onOpenChange={setApproxDateOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex-1 flex items-center gap-3 border border-gray-200 rounded-lg px-3 py-2.5 text-sm font-semibold text-[#1a3c2a] hover:border-[#1a3c2a] transition-colors"
+                  >
+                    <CalendarIcon size={16} className="text-[#1a3c2a]" />
+                    {approxDate
+                      ? format(approxDate, "dd/MM/yyyy")
+                      : "Select date"}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="p-0"
+                  align="start"
+                  style={{ width: "auto", zIndex: 9999 }}
+                  onInteractOutside={(e) => {
+                    e.preventDefault();
+                    setApproxDateOpen(false);
+                  }}
+                >
+                  <div className="p-2">
+                    <Calendar
+                      mode="single"
+                      selected={approxDate}
+                      onSelect={(d) => {
+                        setApproxDate(d);
+                        setApproxDateOpen(false);
+                      }}
+                      initialFocus
+                      className="rounded-md"
+                    />
+                  </div>
+                </PopoverContent>
+              </Popover>
+              {approxDate && (
                 <button
                   type="button"
-                  className="mt-2 w-full flex items-center gap-3 border border-gray-200 rounded-lg px-3 py-2.5 text-sm font-semibold text-[#1a3c2a] hover:border-[#1a3c2a] transition-colors"
+                  onClick={() => setApproxDate(undefined)}
+                  className="w-9 h-9 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-red-50 text-gray-400 hover:text-red-500 flex-shrink-0"
                 >
-                  <CalendarIcon size={16} className="text-[#1a3c2a]" />
-                  {approxDate
-                    ? format(approxDate, "dd/MM/yyyy")
-                    : "Select date"}
+                  <X size={14} />
                 </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[340px] p-0" align="start">
-                <div className="p-3 [--cell-size:42px] text-base">
-                  <Calendar
-                    mode="single"
-                    selected={approxDate}
-                    onSelect={(d) => {
-                      setApproxDate(d);
-                      setApproxDateOpen(false);
-                    }}
-                    initialFocus
-                  />
-                </div>
-              </PopoverContent>
-            </Popover>
+              )}
+            </div>
           </div>
         </div>
 
@@ -393,9 +422,11 @@ export default function AddOrder({ onSubmit, onBack }: Props) {
           <div className="flex items-center justify-between pt-1 border-t border-gray-100">
             <span className="text-sm font-bold text-gray-700">DUE AMOUNT</span>
             <span
-              className={`text-base font-extrabold ${due > 0 ? "text-red-500" : "text-[#1a3c2a]"}`}
+              className={`text-base font-extrabold ${
+                due > 0 ? "text-red-500" : "text-[#1a3c2a]"
+              }`}
             >
-              ₹{due.toLocaleString()}
+              \u20B9{due.toLocaleString()}
             </span>
           </div>
         </div>

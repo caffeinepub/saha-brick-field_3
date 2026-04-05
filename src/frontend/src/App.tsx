@@ -418,14 +418,14 @@ export default function App() {
               updateOrder(editingOrderId, updates);
               setPage("total-orders");
             }}
-            onBack={() => setPage("total-orders")}
+            onBack={() => setPage("dashboard")}
           />
         )}
         {page === "pending-order" && pendingOrderId && (
           <PendingOrderPage
             order={orders.find((o) => o.id === pendingOrderId)!}
             existingPendingDeliveries={pendingDeliveries}
-            onBack={() => setPage("total-orders")}
+            onBack={() => setPage("dashboard")}
             onSave={(delivery) => {
               addPendingDelivery(delivery);
               setPage("pending-delivery");
@@ -435,7 +435,7 @@ export default function App() {
         {page === "pending-delivery" && (
           <PendingDeliveryPage
             deliveries={pendingDeliveries}
-            onBack={() => setPage("total-orders")}
+            onBack={() => setPage("dashboard")}
             onDelete={deletePendingDelivery}
             onCompleteDelivery={goCompleteDeliveryForm}
           />
