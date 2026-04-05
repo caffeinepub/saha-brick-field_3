@@ -120,7 +120,8 @@ export default function AddOrder({ onSubmit, onBack }: Props) {
 
   const batsSafety = selectedBricks.Bats || 0;
 
-  const due = (Number(totalAmount) || 0) - (Number(paidAmount) || 0);
+  const dueRaw = (Number(totalAmount) || 0) - (Number(paidAmount) || 0);
+  const due = dueRaw < 0 ? 0 : dueRaw;
 
   const handleSubmit = () => {
     if (!customerName.trim()) {
@@ -419,14 +420,17 @@ export default function AddOrder({ onSubmit, onBack }: Props) {
               className="w-28 text-right text-sm"
             />
           </div>
-          <div className="flex items-center justify-between pt-1 border-t border-gray-100">
-            <span className="text-sm font-bold text-gray-700">DUE AMOUNT</span>
+          <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-xl px-3 py-3 mt-1">
+            <span className="text-sm font-bold text-red-700 uppercase tracking-wider">
+              DUE AMOUNT
+            </span>
             <span
-              className={`text-base font-extrabold ${
-                due > 0 ? "text-red-500" : "text-[#1a3c2a]"
+              className={`text-xl font-extrabold ${
+                due > 0 ? "text-red-600" : "text-green-700"
               }`}
             >
-              \u20B9{due.toLocaleString()}
+              {"₹"}
+              {due.toLocaleString()}
             </span>
           </div>
         </div>

@@ -265,7 +265,12 @@ function OrderCard({
           </div>
           <div className="flex items-center gap-1 text-xs text-gray-700">
             <span>📞</span>
-            <span className="font-semibold">{order.phone}</span>
+            <a
+              href={`tel:${order.phone}`}
+              className="font-semibold text-blue-600 underline"
+            >
+              {order.phone}
+            </a>
           </div>
           <span className="border border-gray-300 rounded-full px-2 py-0.5 text-[10px] font-semibold text-gray-600">
             {order.locationType}

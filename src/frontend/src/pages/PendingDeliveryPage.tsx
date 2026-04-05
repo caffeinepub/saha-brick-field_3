@@ -299,9 +299,12 @@ export default function PendingDeliveryPage({
                   </div>
                   <div className="flex items-center gap-1.5 text-xs">
                     <span className="text-blue-500">📞</span>
-                    <span className="font-semibold text-blue-600">
+                    <a
+                      href={`tel:${d.phone}`}
+                      className="font-semibold text-blue-600 underline"
+                    >
                       {d.phone}
-                    </span>
+                    </a>
                   </div>
                 </div>
                 <div className="flex items-center justify-between flex-wrap gap-2">
