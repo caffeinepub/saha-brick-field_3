@@ -121,23 +121,22 @@ export default function PendingDeliveryPage({
       "",
     );
     container.style.cssText =
-      "position:fixed;left:-9999px;top:0;width:794px;background:#fff;font-family:Arial,sans-serif;padding:10mm;";
+      "position:fixed;left:-9999px;top:0;width:794px;background:#fff;font-family:Arial,sans-serif;padding:10mm;box-sizing:border-box;";
     document.body.appendChild(container);
     try {
-      await html2pdf()
-        .set({
-          margin: 10,
-          filename: "pending-delivery.pdf",
-          image: { type: "jpeg", quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true },
-          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-        })
-        .from(container)
-        .save();
+      const opt = {
+        margin: 10,
+        filename: "pending-delivery.pdf",
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+      };
+      await html2pdf().from(container).set(opt).save();
     } catch (_e) {
       toast.error("PDF download ব্যর্থ হয়েছে");
     } finally {
-      document.body.removeChild(container);
+      if (document.body.contains(container))
+        document.body.removeChild(container);
     }
   }
 

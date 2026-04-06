@@ -66,3 +66,10 @@
     font-family: "Plus Jakarta Sans", system-ui, sans-serif;
   }
 }
+
+/* Mobile touch optimization - remove 300ms click delay */
+button,
+a,
+[role="button"] {
+  touch-action: manipulation;
+}

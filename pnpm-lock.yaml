@@ -140,18 +140,12 @@ importers:
       embla-carousel-react:
         specifier: ^8.2.1
         version: 8.6.0(react@19.1.1)
-      html2canvas:
-        specifier: ^1.4.1
-        version: 1.4.1
       html2pdf.js:
         specifier: ^0.14.0
         version: 0.14.0
       input-otp:
         specifier: ^1.4.1
         version: 1.4.2(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
-      jspdf:
-        specifier: ^4.2.1
-        version: 4.2.1
       lucide-react:
         specifier: 0.511.0
         version: 0.511.0(react@19.1.1)

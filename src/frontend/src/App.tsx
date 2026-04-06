@@ -7,6 +7,7 @@ import CompleteDeliveryFormPage from "./pages/CompleteDeliveryFormPage";
 import CompleteDeliveryListPage from "./pages/CompleteDeliveryListPage";
 import Dashboard from "./pages/Dashboard";
 import DirectDelivery from "./pages/DirectDelivery";
+import EditCompleteDelivery from "./pages/EditCompleteDelivery";
 import EditOrder from "./pages/EditOrder";
 import PendingDeliveryPage from "./pages/PendingDeliveryPage";
 import PendingOrderPage from "./pages/PendingOrderPage";
@@ -127,6 +128,7 @@ export type Page =
   | "pending-delivery"
   | "complete-delivery-form"
   | "complete-delivery"
+  | "edit-complete-delivery"
   | "closed-orders";
 
 function loadFromStorage<T>(key: string, fallback: T): T {
@@ -350,6 +352,19 @@ export default function App() {
     }
   };
 
+  const [editingCompleteDeliveryId, setEditingCompleteDeliveryId] = useState<
+    string | null
+  >(null);
+
+  const updateCompleteDelivery = (
+    id: string,
+    updates: Partial<CompleteDelivery>,
+  ) => {
+    setCompleteDeliveries((prev) =>
+      prev.map((d) => (d.id === id ? { ...d, ...updates } : d)),
+    );
+  };
+
   const deleteCompleteDelivery = (id: string) => {
     setCompleteDeliveries((prev) => prev.filter((d) => d.id !== id));
   };
@@ -362,6 +377,11 @@ export default function App() {
   const goPendingOrder = (id: string) => {
     setPendingOrderId(id);
     setPage("pending-order");
+  };
+
+  const goEditCompleteDelivery = (id: string) => {
+    setEditingCompleteDeliveryId(id);
+    setPage("edit-complete-delivery");
   };
 
   const goCompleteDeliveryForm = (id: string) => {
@@ -458,6 +478,22 @@ export default function App() {
             deliveries={completeDeliveries}
             onBack={() => setPage("dashboard")}
             onDelete={deleteCompleteDelivery}
+            onEdit={goEditCompleteDelivery}
+          />
+        )}
+        {page === "edit-complete-delivery" && editingCompleteDeliveryId && (
+          <EditCompleteDelivery
+            delivery={
+              completeDeliveries.find(
+                (d) => d.id === editingCompleteDeliveryId,
+              )!
+            }
+            vehicles={vehicles}
+            onBack={() => setPage("complete-delivery")}
+            onSave={(id, updates) => {
+              updateCompleteDelivery(id, updates);
+              setPage("complete-delivery");
+            }}
           />
         )}
         {page === "closed-orders" && (

@@ -15,12 +15,14 @@ type Props = {
   deliveries: CompleteDelivery[];
   onBack: () => void;
   onDelete: (id: string) => void;
+  onEdit: (id: string) => void;
 };
 
 export default function CompleteDeliveryListPage({
   deliveries,
   onBack,
   onDelete,
+  onEdit,
 }: Props) {
   const [search, setSearch] = useState("");
   const [fromDate, setFromDate] = useState("");
@@ -123,23 +125,22 @@ export default function CompleteDeliveryListPage({
       "",
     );
     container.style.cssText =
-      "position:fixed;left:-9999px;top:0;width:794px;background:#fff;font-family:Arial,sans-serif;padding:10mm;";
+      "position:fixed;left:-9999px;top:0;width:794px;background:#fff;font-family:Arial,sans-serif;padding:10mm;box-sizing:border-box;";
     document.body.appendChild(container);
     try {
-      await html2pdf()
-        .set({
-          margin: 10,
-          filename: "complete-delivery.pdf",
-          image: { type: "jpeg", quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true },
-          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-        })
-        .from(container)
-        .save();
+      const opt = {
+        margin: 10,
+        filename: "complete-delivery.pdf",
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+      };
+      await html2pdf().from(container).set(opt).save();
     } catch (_e) {
       toast.error("PDF download ব্যর্থ হয়েছে");
     } finally {
-      document.body.removeChild(container);
+      if (document.body.contains(container))
+        document.body.removeChild(container);
     }
   }
 
@@ -292,6 +293,7 @@ export default function CompleteDeliveryListPage({
                   <div className="flex gap-1.5">
                     <button
                       type="button"
+                      onClick={() => onEdit(d.id)}
                       className="w-9 h-9 rounded-full border border-gray-200 flex items-center justify-center hover:bg-blue-50 bg-white shadow-sm"
                     >
                       <Edit2 size={14} className="text-blue-500" />

@@ -199,19 +199,22 @@ export default function ReportsPage({ completeDeliveries, onBack }: Props) {
     if (!el) return;
     const title = activeTab === "daily" ? "daily-report" : "weekly-report";
     try {
-      await html2pdf()
-        .set({
-          margin: 10,
-          filename: `${title}.pdf`,
-          image: { type: "jpeg", quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true, logging: false },
-          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-          pagebreak: { mode: ["avoid-all", "css"] },
-        })
-        .from(el)
-        .save();
+      const opt = {
+        margin: 10,
+        filename: `${title}.pdf`,
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          letterRendering: true,
+        },
+        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+      };
+      await html2pdf().from(el).set(opt).save();
     } catch (e) {
       console.error("PDF error:", e);
+      alert("PDF download failed. Please try again.");
     }
   }
 
