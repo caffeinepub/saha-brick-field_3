@@ -419,6 +419,9 @@ export default function App() {
           <DirectDelivery
             onBack={() => setPage("dashboard")}
             vehicles={vehicles}
+            onSave={(cd) => {
+              addCompleteDelivery(cd);
+            }}
           />
         )}
         {page === "total-orders" && (

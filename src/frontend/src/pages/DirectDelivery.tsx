@@ -11,11 +11,12 @@ import { format } from "date-fns";
 import { ArrowLeft, CalendarIcon, Plus, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import type { Vehicle } from "../App";
+import type { CompleteDelivery, Vehicle } from "../App";
 
 type Props = {
   onBack: () => void;
   vehicles: Vehicle[];
+  onSave: (cd: Omit<CompleteDelivery, "id" | "createdAt">) => void;
 };
 
 const BRICK_TYPES = [
@@ -34,7 +35,7 @@ const labelStyle =
 
 const inputStyle = "border-border focus-visible:ring-[oklch(0.45_0.1_145)]";
 
-export default function DirectDelivery({ onBack, vehicles }: Props) {
+export default function DirectDelivery({ onBack, vehicles, onSave }: Props) {
   const [date, setDate] = useState<Date>(new Date());
   const [dateOpen, setDateOpen] = useState(false);
 
@@ -149,42 +150,93 @@ export default function DirectDelivery({ onBack, vehicles }: Props) {
       return;
     }
 
-    const brickItems = Array.from(selectedBricks).map((type) => ({
+    // Load rate from settings
+    let ratePerThousand = 0;
+    let batsRate = 0;
+    try {
+      const savedRate = localStorage.getItem("sbf_rate");
+      if (savedRate) {
+        const rates = JSON.parse(savedRate);
+        if (vehicleType === "Tractor") {
+          const tr = rates.tractorRate || {};
+          ratePerThousand =
+            locationType === "Outside"
+              ? Number(tr.outsidePerThousand || 0)
+              : Number(tr.localPerThousand || 0);
+          batsRate = Number(tr.batsRate || rates.batsRate || 0);
+        } else {
+          const wr = rates.wheelRate || {};
+          ratePerThousand = Number(wr.perThousand || 0);
+          batsRate = Number(wr.batsRate || rates.batsRate || 0);
+        }
+      }
+    } catch {}
+
+    // Build deliverItems in CompleteDelivery format
+    const deliverItems = Array.from(selectedBricks).map((type) => ({
       type,
-      quantity: Number(brickQty[type]) || 0,
-      ...(type === "Bats" ? { safetyQty: Number(batsSafetyQty) || 0 } : {}),
+      deliverQty: Number(brickQty[type]) || 0,
     }));
 
-    const entry = {
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString(),
-      date: format(date, "yyyy-MM-dd"),
+    // Calculate totalAmount
+    const isOnlyBats =
+      deliverItems.length > 0 && deliverItems.every((i) => i.type === "Bats");
+    let totalAmount = 0;
+    if (isOnlyBats) {
+      const batsQty =
+        deliverItems.find((i) => i.type === "Bats")?.deliverQty || 0;
+      totalAmount = (batsQty / 100) * batsRate;
+    } else {
+      totalAmount = deliverItems
+        .filter((i) => i.type !== "Bats")
+        .reduce((sum, i) => sum + (i.deliverQty / 1000) * ratePerThousand, 0);
+    }
+
+    // Labour calculation
+    const allLabours = Array.from(
+      new Set([...loadingLabours, ...unloadingLabours]),
+    );
+    const totalLabours = allLabours.length;
+    const halfTotal = totalAmount / 2;
+    const perLoadingLabour =
+      loadingLabours.length > 0 ? halfTotal / loadingLabours.length : 0;
+    const perUnloadingLabour =
+      unloadingLabours.length > 0 ? halfTotal / unloadingLabours.length : 0;
+    const labourBreakdown: Record<string, number> = {};
+    for (const name of allLabours) {
+      let amount = 0;
+      if (loadingLabours.includes(name)) amount += perLoadingLabour;
+      if (unloadingLabours.includes(name)) amount += perUnloadingLabour;
+      labourBreakdown[name] = amount;
+    }
+    const perLabourAvg = totalLabours > 0 ? totalAmount / totalLabours : 0;
+
+    const cd: Omit<CompleteDelivery, "id" | "createdAt"> = {
+      pendingDeliveryId: `direct-${Date.now()}`,
       customerName: customerName.trim(),
       address: address.trim(),
       phone: phone.trim(),
       invoice: invoice.trim(),
-      brickItems,
-      totalBricks,
-      totalBatsSafety,
       locationType,
+      deliveryDate: format(date, "yyyy-MM-dd"),
       vehicleType,
       vehicleNumber: selectedVehicle?.number || "",
       loadingLabours,
       unloadingLabours,
+      deliverItems,
+      dueAmount: 0,
+      ratePerThousand,
+      batsRate,
+      totalAmount,
+      totalLabours,
+      perLabourAvg,
+      labourBreakdown,
       paymentStatus,
     };
 
-    try {
-      const existing = JSON.parse(
-        localStorage.getItem("sbf_direct_deliveries") || "[]",
-      );
-      existing.push(entry);
-      localStorage.setItem("sbf_direct_deliveries", JSON.stringify(existing));
-      toast.success("Direct delivery saved successfully");
-      onBack();
-    } catch {
-      toast.error("Failed to save delivery");
-    }
+    onSave(cd);
+    toast.success("Direct delivery saved successfully");
+    onBack();
   };
 
   return (
